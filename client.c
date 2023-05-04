@@ -6,7 +6,7 @@
 int main(int argc, char *argv[]) {
     int exit_code = 0;
 
-    rpc_client *state = rpc_init_client("::1", PORT_NUM);
+    rpc_client *state = rpc_init_client("::1", PORT_NUM);       // todo take these values from command line
     if (state == NULL) {
         exit(EXIT_FAILURE);
     }

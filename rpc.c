@@ -40,8 +40,8 @@ rpc_client *rpc_init_client(char *addr, int port) {
     rpc_client *client = malloc(sizeof(rpc_client));
     if (client == NULL) return NULL;            // Failed to allocate memory
 
-
-    int n, s;
+    // Given memory allocation is successful begin initiation
+    int sockfd, n, s;
     struct addrinfo *servinfo, *rp;
 
     // Create address
@@ -50,24 +50,34 @@ rpc_client *rpc_init_client(char *addr, int port) {
     client->hints.ai_socktype = SOCK_STREAM;
 
     // Get addrinfo of server
-    s = getaddrinfo(addr, port, &hints, &servinfo)
+    s = getaddrinfo(addr, port, &client->hints, &servinfo)
     if (s != 0) {
 		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));
+        free(client);
 		exit(EXIT_FAILURE);
 	}
 
-    // Connect to valid IPv6 result
-    for (rp = servinfo; rp != NULL; p = p->ai_next) {
-        if (rp->ai_family == AF_INET6
-            && (sockfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol)) < 0) {
+    // Connect to valid result
+    for (rp = servinfo; rp != NULL; rp = rp->ai_next) {
+        // Only accept IPv6
+        if (rp->ai_family == AF_INET6) {
 
-            }
-
+            client->sockfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol)
+            if (client->sockfd < 0) continue;                                           // Invalid socket
+            if (connect(client->sockfd, rp->ai_addr, rp->ai_addrlen) != -1) break;      // Success
+            else close(client->sockfd);
+        }
     }
+    // If socket was not successfully connected, return a fail (NULL).
+    if (rp == NULL) {
+        free(client);
+        freeaddrinfo(servinfo);
+        return NULL;
+    }
+    freeaddrinfo(servinfo);
 
-    client->sockfd
-
-    return NULL;
+    // Otherwise return successfully linked client
+    return client;
 }
 
 rpc_handle *rpc_find(rpc_client *cl, char *name) {
