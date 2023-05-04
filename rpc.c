@@ -5,11 +5,73 @@
 
 struct rpc_server {
     /* Add variable(s) for server state */
+    int newsockfd;
+    int sockfd;
+    struct addrinfo hints;
 };
 
 rpc_server *rpc_init_server(int port) {
+    rpc_server *server = malloc(sizeof(rpc_server));
+    if (server == NULL) return NULL;            // Failed to allocate memory
 
-    return NULL;
+    // Given memory allocation is successful begin initiation
+    int re, s;
+    struct addrinfo *res;
+
+    // Create address
+    memset(&server->hints, 0, sizeof server->hints);
+    server->hints.ai_family = AF_INET6;         // IPv6
+	server->hints.ai_socktype = SOCK_STREAM;    // Connection-mode byte streams
+	server->hints.ai_flags = AI_PASSIVE;        // for bind, listen, accept
+    
+    // Get addrinfo
+    s = getaddrinfo(NULL, port, &server->hints, &res);
+    if (s != 0) {
+		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));
+        free(server);
+        freeaddrinfo(res);
+		exit(EXIT_FAILURE);         // todo -change to return NULL
+	}
+
+    // Create socket
+	server->sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+	if (server->sockfd < 0) {
+		perror("socket");
+        free(server);
+        freeaddrinfo(res);
+		exit(EXIT_FAILURE);         // todo -change to return NULL
+	}
+
+    // Reuse port if possible
+    re = 1;
+	if (setsockopt(server->sockfd, SOL_SOCKET, SO_REUSEADDR, &re, sizeof(int)) < 0) {
+		perror("setsockopt");
+        close(server->sockfd)
+        free(server);
+        freeaddrinfo(res);
+		exit(EXIT_FAILURE);         // todo -change to return NULL
+	}
+	// Bind address to the socket
+	if (bind(sockfd, res->ai_addr, res->ai_addrlen) < 0) {
+		perror("bind");
+        close(server->sockfd)
+        free(server);
+        freeaddrinfo(res);
+		exit(EXIT_FAILURE);         // todo -change to return NULL
+	}
+	freeaddrinfo(res);
+
+
+    // -- Successfully initiated server socket, set to listen --
+    if (listen(server->sockfd, 10) < 0) {    // todo - find out what this number means
+        perror("listen");
+        close(server->sockfd)
+        free(server);
+        exit(EXIT_FAILURE);
+    }
+
+    // Given listen is successful, return server (not yet blocked)
+	return server;
 }
 
 int rpc_register(rpc_server *srv, char *name, rpc_handler handler) {
@@ -27,7 +89,7 @@ void rpc_serve_all(rpc_server *srv) {
 }
 
 struct rpc_client {
-    /* Add variable(s) for client state */
+    /* Variable(s) for client state */
     int sockfd;
     struct addrinfo hints;
 };
@@ -41,7 +103,7 @@ rpc_client *rpc_init_client(char *addr, int port) {
     if (client == NULL) return NULL;            // Failed to allocate memory
 
     // Given memory allocation is successful begin initiation
-    int sockfd, n, s;
+    int s;
     struct addrinfo *servinfo, *rp;
 
     // Create address
@@ -50,7 +112,7 @@ rpc_client *rpc_init_client(char *addr, int port) {
     client->hints.ai_socktype = SOCK_STREAM;
 
     // Get addrinfo of server
-    s = getaddrinfo(addr, port, &client->hints, &servinfo)
+    s = getaddrinfo(addr, port, &client->hints, &servinfo);
     if (s != 0) {
 		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));
         free(client);
