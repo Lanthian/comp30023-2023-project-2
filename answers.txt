@@ -1,0 +1,48 @@
+Liam Anthian, lanthian, 1269187
+===== Planning =====
+1.
+Project: Just a subset of users which are on the same network, same machine
+    (as IPv6 and port links server interaction)
+Real world: Only a subset of users authenticated to be whitelisted or allowed
+    via some login details sent to the server upon trying to establish a 
+    connection. 
+
+2.
+Project: 
+Real world: Provided via othermeans, as placing authentication inside the RPC 
+    framework bloats it's purpose and decreases cohesion. Authentication should
+    be tacked on top via whatever linking method between client and RPC server
+    utilise.
+
+3.
+
+4.
+Project: Sockets should be created in the server and client generation, and 
+    linked into full sockets upon registration.
+Real world: Client socket can still be issued on creation, however server socket
+    should only be created and linked at the registration stage, to allow 
+    multiple clients access to the same server.
+
+5.
+
+6.
+Project: if one host uses big-endian and another little-endian there will be a 
+    mismatch in the data transferred (or rather, read) between the hosts. Both 
+    hosts will work on their own but communication (and effectively all steps
+    that make these instances meaningful) will not be possible.
+Real world: Some buffer in between will most likely transform the data over the 
+    network to the correct byte ordering. This issue should be managed fairly
+    seemlessly. (e.g. Server may have some step that checks and converts all 
+    read in byte data to the correct ordering for its use, transforming ordering
+    back when passing back bytes.)
+
+
+===== Protocol =====
+Transport has to run on top of IPv6 so realistically only two options exist for 
+transport protocol - TCP, UDP. One of these two protocols is essentially 
+required as majority of firewalls nowadays block everything other than TCP and 
+UDP, and thus for any other protocol, a large number of users would not be able 
+to interact with the RPC system.
+
+??? TCP provides authentication and ....
+<benefits of TCP over UDP>

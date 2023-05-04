@@ -6,6 +6,8 @@
 
 #include <stddef.h>
 
+#define PORT_NUM 3000
+
 /* Server state */
 typedef struct rpc_server rpc_server;
 /* Client state */
