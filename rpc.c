@@ -22,6 +22,7 @@ struct rpc_server {
     struct sockaddr_in client_addr;
     socklen_t client_addr_size;
 
+    // everything below here needs to be freed at some point
     rpc_handle* handle;
 };
 
@@ -32,6 +33,8 @@ rpc_server *rpc_init_server(int port) {
 
     rpc_server *server = malloc(sizeof(rpc_server));
     if (server == NULL) return NULL;            // Failed to allocate memory
+    server->handle = NULL;          // todo --- will cause you a problem later hahha
+    
 
     // Given memory allocation is successful begin initiation
     int re, s;
@@ -112,7 +115,7 @@ int rpc_register(rpc_server *srv, char *name, rpc_handler handler) {
 
     srv->handle->handle_id = 12;                // todo / temp
     strcpy(srv->handle->function_name, name);
-    srv->handle->function = handler;
+    srv->handle->function = NULL;                // todo handler
 
     return REGISTER_SUCCESS;
 }
@@ -123,9 +126,18 @@ void rpc_serve_all(rpc_server *srv) {
     printf("Didn't expect that to work...\n");
 
 
+    struct sockaddr_in client_addr;
+    socklen_t client_addr_size;
+
     srv->client_addr_size = sizeof srv->client_addr;
-	srv->newsockfd = accept(srv->sockfd, (struct sockaddr*)&srv->client_addr, 
-                            &srv->client_addr_size);
+	srv->newsockfd = accept(srv->sockfd, (struct sockaddr*)&client_addr, 
+                            &(srv->client_addr_size));
+    // srv->newsockfd = accept(srv->sockfd, (struct sockaddr*) &(srv->client_addr), 
+    //                         &(srv->client_addr_size));
+    
+
+    printf("K");
+    print_server_handle(srv);
 
 
 	if (srv->newsockfd < 0) {
@@ -138,11 +150,27 @@ void rpc_serve_all(rpc_server *srv) {
     char ip[INET6_ADDRSTRLEN];
     int port;
 
-    getpeername(srv->newsockfd, (struct sockaddr*)&srv->client_addr, 
-                            &srv->client_addr_size);
-    inet_ntop(srv->client_addr.sin_family, &srv->client_addr.sin_addr, ip, INET6_ADDRSTRLEN);
-    port = ntohs(srv->client_addr.sin_port);
-    printf("new connection from %s:%d on socket %d\n", ip, port, srv->newsockfd);
+        printf("V-- here");
+    print_server_handle(srv);
+
+    getpeername(srv->newsockfd, (struct sockaddr*)&client_addr, 
+                            &(srv->client_addr_size));
+    // getpeername(srv->newsockfd, (struct sockaddr*) &(srv->client_addr), 
+    //                         &(srv->client_addr_size));
+
+        printf("&*()");
+    print_server_handle(srv);
+
+    // inet_ntop(srv->client_addr.sin_family, &srv->client_addr.sin_addr, ip, INET6_ADDRSTRLEN);
+
+        printf("ASD");
+    print_server_handle(srv);
+
+    // port = ntohs(srv->client_addr.sin_port);
+    // printf("new connection from %s:%d on socket %d\n", ip, port, srv->newsockfd);
+
+        printf("V");
+    print_server_handle(srv);
     
 
     // // ========================================================================
@@ -179,6 +207,10 @@ void rpc_serve_all(rpc_server *srv) {
         exit(EXIT_FAILURE);
     }
     printf("y111\n");
+
+        printf("CC");
+    print_server_handle(srv);
+
     func_name[n] = '\0';
     printf("yyy, %d\n", n);
     // Null-terminate string
@@ -186,9 +218,13 @@ void rpc_serve_all(rpc_server *srv) {
     printf("%d\n", 2);
     printf("why %d > %d         ", 42, 42);
 
+        printf("L");
+    print_server_handle(srv);
+
     printf("compare name w/ existing function name\n");
     // Check if handle exists           // todo - properly please lym
-    if (0 != 0) {                   // strcmp(srv->handle->function_name, func_name)
+    printf("Handle: %s, Searched: %s\n", srv->handle->function_name, func_name);
+    if (strcmp(srv->handle->function_name, func_name) != 0) {                   // strcmp(srv->handle->function_name, func_name)
         // Function doesn't exist
         printf("Function %s not found.\n", func_name);
         printf("Try %s instead.\n", srv->handle->function_name);
@@ -198,7 +234,7 @@ void rpc_serve_all(rpc_server *srv) {
 
     // Write message back
     char id[MAX_HANDLE_LENGTH];
-    int cx = snprintf(id, 1000-1, "%d", 42);
+    snprintf(id, MAX_HANDLE_LENGTH-1, "%d", 42);
 
 	printf("Function %s called.\n", func_name);
 	n = write(srv->newsockfd, id, MAX_HANDLE_LENGTH);
@@ -208,7 +244,9 @@ void rpc_serve_all(rpc_server *srv) {
 	}   
 
     printf("No errors.\n");
-    printf("%s", srv->handle->function_name);
+    // printf("%s", srv->handle->function_name);
+        printf("H");
+    print_server_handle(srv);
 }
 
 struct rpc_client {

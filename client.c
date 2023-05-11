@@ -64,7 +64,7 @@ int main(int argc, char *argv[]) {
     }
 
     printf("3 (using handle_add2 = %p)\n", handle_add2);
-    return -1;
+    // return -1;
 
     for (int i = 0; i < 2; i++) {
         /* Prepare request */

@@ -19,7 +19,9 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    print_server_handle(server);
+    for (int i = 0; i < 1; i++) {
+        print_server_handle(server);
+    }
 
     // todo - check if rpc_register done properly
 
