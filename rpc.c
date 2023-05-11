@@ -1,4 +1,7 @@
 #include "rpc.h"
+
+#define _POSIX_C_SOURCE 200112L
+
 #include <netdb.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -100,7 +103,7 @@ int rpc_register(rpc_server *srv, char *name, rpc_handler handler) {
 }
 
 void rpc_serve_all(rpc_server *srv) {
-
+    printf("---Serving!---\n");
 }
 
 struct rpc_client {

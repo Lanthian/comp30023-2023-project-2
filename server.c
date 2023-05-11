@@ -19,7 +19,9 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
+    printf("Serving all right now:\n");
     rpc_serve_all(state);
+    printf("Somehow done serving all...?\n");
 
     return 0;
 }
