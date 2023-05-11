@@ -93,7 +93,7 @@ cleanup:
 struct rpc_handle {
     /* Add variable(s) for handle */
     int handle_id;
-    char* function_name;
+    char function_name[MAX_FUNC_LENGTH];
     rpc_handler function;
 };
 
@@ -111,7 +111,7 @@ int rpc_register(rpc_server *srv, char *name, rpc_handler handler) {
     }
 
     srv->handle->handle_id = 12;                // todo / temp
-    srv->handle->function_name = name;
+    strcpy(srv->handle->function_name, name);
     srv->handle->function = handler;
 
     return REGISTER_SUCCESS;
@@ -119,6 +119,9 @@ int rpc_register(rpc_server *srv, char *name, rpc_handler handler) {
 
 void rpc_serve_all(rpc_server *srv) {
     printf("---Serving!---\n");
+    print_server_handle(srv);
+    printf("Didn't expect that to work...\n");
+
 
     srv->client_addr_size = sizeof srv->client_addr;
 	srv->newsockfd = accept(srv->sockfd, (struct sockaddr*)&srv->client_addr, 
@@ -142,49 +145,60 @@ void rpc_serve_all(rpc_server *srv) {
     printf("new connection from %s:%d on socket %d\n", ip, port, srv->newsockfd);
     
 
-    // ========================================================================
-    // temp change to test read-write
-    char buffer[256];
-    // Read characters from the connection, then process
-	int n = read(srv->newsockfd, buffer, 255); // n is number of characters read
-	if (n < 0) {
-		perror("read");
-		exit(EXIT_FAILURE);
-	}
-	// Null-terminate string
-	buffer[n] = '\0';
+    // // ========================================================================
+    // // temp change to test read-write
+    // char buffer[256];
+    // // Read characters from the connection, then process
+	// int n = read(srv->newsockfd, buffer, 255); // n is number of characters read
+	// if (n < 0) {
+	// 	perror("read");
+	// 	exit(EXIT_FAILURE);
+	// }
+	// // Null-terminate string
+	// buffer[n] = '\0';
 
-	// Write message back
-	printf("Here is the message: %s\n", buffer);
-	n = write(srv->newsockfd, "I got your message\n", 19);
-	if (n < 0) {
-		perror("write");
-		exit(EXIT_FAILURE);
-	}
-    // ........................................................................
+	// // Write message back
+	// printf("Here is the message: %s\n", buffer);
+	// n = write(srv->newsockfd, "I got your message\n", 19);
+	// if (n < 0) {
+	// 	perror("write");
+	// 	exit(EXIT_FAILURE);
+	// }
+    // // ........................................................................
 
+
+    printf("Read in function call\n");
+    // print_server_handle(srv);
 
     // Read in function call requests
+    printf("xxx, %d\n", 42);
     char func_name[MAX_FUNC_LENGTH];
-    n = read(srv->newsockfd, func_name, MAX_FUNC_LENGTH-1);    // n is the number of characters read
+    int n = read(srv->newsockfd, func_name, MAX_FUNC_LENGTH-1);    // n is the number of characters read
     if (n < 0) {
         perror("read");
         exit(EXIT_FAILURE);
     }
-    // Null-terminate string
+    printf("y111\n");
     func_name[n] = '\0';
+    printf("yyy, %d\n", n);
+    // Null-terminate string
+    printf("ssssssssssssssssssss\n");
+    printf("%d\n", 2);
+    printf("why %d > %d         ", 42, 42);
 
+    printf("compare name w/ existing function name\n");
     // Check if handle exists           // todo - properly please lym
-    if (strcmp(srv->handle->function_name, func_name) != 0) {
+    if (0 != 0) {                   // strcmp(srv->handle->function_name, func_name)
         // Function doesn't exist
         printf("Function %s not found.\n", func_name);
         printf("Try %s instead.\n", srv->handle->function_name);
         return;
     }
+    printf("um..\n");
 
     // Write message back
     char id[MAX_HANDLE_LENGTH];
-    sprintf(id, "%d", srv->handle->handle_id);
+    int cx = snprintf(id, 1000-1, "%d", 42);
 
 	printf("Function %s called.\n", func_name);
 	n = write(srv->newsockfd, id, MAX_HANDLE_LENGTH);
@@ -194,6 +208,7 @@ void rpc_serve_all(rpc_server *srv) {
 	}   
 
     printf("No errors.\n");
+    printf("%s", srv->handle->function_name);
 }
 
 struct rpc_client {
@@ -257,32 +272,37 @@ rpc_client *rpc_init_client(char *addr, int port) {
 
 rpc_handle *rpc_find(rpc_client *cl, char *name) {
     // Malloc space to return a handle
-    rpc_handle *handle = malloc(sizeof(handle));
-    if (handle != NULL) {
+    rpc_handle *handle = malloc(sizeof(rpc_handle));
+    if (handle == NULL) {
         perror("lack of memory");
         exit(EXIT_FAILURE);
     }
 
+    printf("good sign!\n");
     handle->handle_id = -1;
     handle->function = NULL;
-    handle->function_name = NULL;
+    // handle->function_name = NULL;
 
     // todo / temp
     char buffer[MAX_HANDLE_LENGTH];           // allowing up to 10 decimal digit int IDs
     // Send name to server
+    printf("ccc\n");
     int n = write(cl->sockfd, name, strlen(name));
     if (n < 0) {
         perror("socket");
         exit(EXIT_FAILURE);
     }
+    printf("ddd\n");
     // Read handle ID to construct handle from server
     n = read(cl->sockfd, buffer, MAX_HANDLE_LENGTH-1);
     if (n < 0) {
         perror("read");
         exit(EXIT_FAILURE);
     }
+    printf("eee\n");
     // Null-terminate string
     buffer[n] = '\0';
+    
 
     // Transform string ID to int ID
     int x = atoi(buffer);
@@ -294,6 +314,7 @@ rpc_handle *rpc_find(rpc_client *cl, char *name) {
 
     // Otherwise search was successful. Return handle object.
     handle->handle_id = x;
+    printf("prc_find is fine?\n");
     return handle;
 }
 
@@ -326,4 +347,10 @@ void rpc_data_free(rpc_data *data) {
 // temp 2023.05.11
 int return_sockfd(rpc_client *client) {
     return client->sockfd;
+}
+
+void print_server_handle(rpc_server *server) {
+    printf(">> %d\n", server->handle->handle_id);
+    printf(">> %s\n", server->handle->function_name);
+    printf(">> %p\n", server->handle->function);
 }

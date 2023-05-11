@@ -6,21 +6,26 @@
 rpc_data *add2_i8(rpc_data *);
 
 int main(int argc, char *argv[]) {
-    rpc_server *state;
+    rpc_server *server;
 
-    state = rpc_init_server(PORT_NUM);
-    if (state == NULL) {
+    server = rpc_init_server(PORT_NUM);
+    if (server == NULL) {
         fprintf(stderr, "Failed to init\n");
         exit(EXIT_FAILURE);
     }
 
-    if (rpc_register(state, "add2", add2_i8) == -1) {
+    if (rpc_register(server, "add2", add2_i8) == -1) {
         fprintf(stderr, "Failed to register add2\n");
         exit(EXIT_FAILURE);
     }
 
+    print_server_handle(server);
+
+    // todo - check if rpc_register done properly
+
+
     printf("Serving all right now:\n");
-    rpc_serve_all(state);
+    rpc_serve_all(server);
     printf("Somehow done serving all...?\n");
 
     return 0;

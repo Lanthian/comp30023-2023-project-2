@@ -75,5 +75,6 @@ void rpc_data_free(rpc_data *data);
 
 // temp 2023.05.11
 int return_sockfd(rpc_client *client);
+void print_server_handle(rpc_server *server);
 
 #endif

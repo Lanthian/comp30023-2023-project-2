@@ -26,33 +26,33 @@ int main(int argc, char *argv[]) {
 
 
     printf("1.5\n");
-    // ========================================================================
-    // temp change to test read-write
-    char buffer[256];
-    // Read message from stdin
-	printf("Please enter the message: ");
-	if (fgets(buffer, 255, stdin) == NULL) {
-		exit(EXIT_SUCCESS);
-	}
-	// Remove \n that was read by fgets
-	buffer[strlen(buffer) - 1] = 0;
+    // // ========================================================================
+    // // temp change to test read-write
+    // char buffer[256];
+    // // Read message from stdin
+	// printf("Please enter the message: ");
+	// if (fgets(buffer, 255, stdin) == NULL) {
+	// 	exit(EXIT_SUCCESS);
+	// }
+	// // Remove \n that was read by fgets
+	// buffer[strlen(buffer) - 1] = 0;
 
-    // Send message to server
-	int n = write(return_sockfd(client), buffer, strlen(buffer));
-	if (n < 0) {
-		perror("socket");
-		exit(EXIT_FAILURE);
-	}    
-    // Read message from server
-	n = read(return_sockfd(client), buffer, 255);
-	if (n < 0) {
-		perror("read");
-		exit(EXIT_FAILURE);
-	}
-	// Null-terminate string
-	buffer[n] = '\0';
-	printf("%s\n", buffer);
-    // ........................................................................
+    // // Send message to server
+	// int n = write(return_sockfd(client), buffer, strlen(buffer));
+	// if (n < 0) {
+	// 	perror("socket");
+	// 	exit(EXIT_FAILURE);
+	// }    
+    // // Read message from server
+	// n = read(return_sockfd(client), buffer, 255);
+	// if (n < 0) {
+	// 	perror("read");
+	// 	exit(EXIT_FAILURE);
+	// }
+	// // Null-terminate string
+	// buffer[n] = '\0';
+	// printf("%s\n", buffer);
+    // // ........................................................................
 
 
     printf("2\n");
@@ -63,7 +63,9 @@ int main(int argc, char *argv[]) {
         goto cleanup;
     }
 
-    printf("3\n");
+    printf("3 (using handle_add2 = %p)\n", handle_add2);
+    return -1;
+
     for (int i = 0; i < 2; i++) {
         /* Prepare request */
         char left_operand = i;
