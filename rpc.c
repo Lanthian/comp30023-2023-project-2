@@ -1,6 +1,6 @@
 #include "rpc.h"
 
-#define _POSIX_C_SOURCE 200112L
+// #define _POSIX_C_SOURCE 200112L
 
 #include <netdb.h>
 #include <stdio.h>
@@ -14,6 +14,9 @@ struct rpc_server {
     int newsockfd;
     int sockfd;
     struct addrinfo hints;
+
+    struct sockaddr_in client_addr;
+    socklen_t client_addr_size;
 
     char* function_name;
     rpc_handler function;
@@ -104,6 +107,16 @@ int rpc_register(rpc_server *srv, char *name, rpc_handler handler) {
 
 void rpc_serve_all(rpc_server *srv) {
     printf("---Serving!---\n");
+
+    srv->client_addr_size = sizeof srv->client_addr;
+	srv->newsockfd = accept(srv->sockfd, (struct sockaddr*)&srv->client_addr, 
+                            &srv->client_addr_size);
+	if (srv->newsockfd < 0) {
+		perror("accept");
+		exit(EXIT_FAILURE);
+	}
+
+    printf("CONNECTION ESTABLISHED!!!\n");
 }
 
 struct rpc_client {
