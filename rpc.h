@@ -70,4 +70,10 @@ void rpc_close_client(rpc_client *cl);
 /* Frees a rpc_data struct */
 void rpc_data_free(rpc_data *data);
 
+
+
+
+// temp 2023.05.11
+int return_sockfd(rpc_client *client);
+
 #endif
