@@ -6,11 +6,20 @@
 int main(int argc, char *argv[]) {
     int exit_code = 0;
 
-    rpc_client *state = rpc_init_client("::1", PORT_NUM);       // todo take these values from command line
+    printf("1\n");
+    if (argc < 2) {
+        printf("Not enough arguments\n");
+    } 
+    printf("IP: %s\n", argv[1]);
+
+
+    rpc_client *state = rpc_init_client(argv[1], PORT_NUM);       // todo take these values from command line
     if (state == NULL) {
+        printf("rpc_init_client return fail.\n");
         exit(EXIT_FAILURE);
     }
 
+    printf("2\n");
     rpc_handle *handle_add2 = rpc_find(state, "add2");
     if (handle_add2 == NULL) {
         fprintf(stderr, "ERROR: Function add2 does not exist\n");
@@ -18,6 +27,7 @@ int main(int argc, char *argv[]) {
         goto cleanup;
     }
 
+    printf("3\n");
     for (int i = 0; i < 2; i++) {
         /* Prepare request */
         char left_operand = i;
