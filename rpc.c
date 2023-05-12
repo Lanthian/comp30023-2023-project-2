@@ -234,9 +234,9 @@ void rpc_serve_all(rpc_server *srv) {
 
     // Write message back
     char id[MAX_HANDLE_LENGTH];
-    snprintf(id, MAX_HANDLE_LENGTH-1, "%d", 42);
+    snprintf(id, MAX_HANDLE_LENGTH, "%d", 42);
 
-	printf("Function %s called.\n", func_name);
+	printf("Function %s requested.\n", func_name);
 	n = write(srv->newsockfd, id, MAX_HANDLE_LENGTH);
 	if (n < 0) {
 		perror("write");
@@ -247,6 +247,23 @@ void rpc_serve_all(rpc_server *srv) {
     // printf("%s", srv->handle->function_name);
         printf("H");
     print_server_handle(srv);
+
+    printf("Try using func calls now\n");
+    while (1) {
+        char func_handle[3];        // can take 0-99 handles
+        
+        int n = read(srv->newsockfd, func_handle, 3-1);    // n is the number of characters read
+        if (n < 0) {
+            perror("read");
+            exit(EXIT_FAILURE);
+        }
+        func_handle[n] = '\0';
+
+        printf("function request for id [%s] received.\n", func_handle);
+
+        
+        break;
+    }
 }
 
 struct rpc_client {
@@ -356,8 +373,22 @@ rpc_handle *rpc_find(rpc_client *cl, char *name) {
     return handle;
 }
 
+#define temp 3
+
 rpc_data *rpc_call(rpc_client *cl, rpc_handle *h, rpc_data *payload) {
+    char handle_id[temp];
+    snprintf(handle_id, temp, "%d", 23);
+
+    int n = write(cl->sockfd, handle_id, temp);
+    if (n < 0) {
+		perror("write");
+		exit(EXIT_FAILURE);
+	}   
+    printf("Wrote function call for function [%s] to server\n", handle_id);
+
     return NULL;
+
+
 }
 
 void rpc_close_client(rpc_client *cl) {
