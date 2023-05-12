@@ -260,6 +260,7 @@ void rpc_serve_all(rpc_server *srv) {
         func_handle[n] = '\0';
 
         printf("function request for id [%s] received.\n", func_handle);
+        // todo - thread here? Or earlier... Dunno.
 
         
         break;
@@ -422,4 +423,38 @@ void print_server_handle(rpc_server *server) {
     printf(">> %d\n", server->handle->handle_id);
     printf(">> %s\n", server->handle->function_name);
     printf(">> %p\n", server->handle->function);
+}
+
+void rpc_send_data(int socket, rpc_data *data) {
+    // write to a socket, translate data (via buffer and conversion) to string / byte format first.
+    // different errors for each stage that can fail.
+
+
+    char int_buffer[10];
+    char data_2_len[10];
+
+
+
+    int n = read(socket, int_buffer, 10);
+	if (n < 0) {
+		perror("read");
+		exit(EXIT_FAILURE);
+	}   
+}
+
+rpc_data *rpc_receive_data(int socket) {
+    // read from a socket, translate data (via buffer and conversion, etc.) back to ideal data
+    // malloc an rpc_data (can be moved to where this is called instead I guess)
+    // remember to free this malloc later
+
+    rpc_data *data = malloc(sizeof(data))
+
+    char int_buffer[10];
+    char data_2_len[10];
+
+    int n = read(socket, int_buffer, 10);
+	if (n < 0) {
+		perror("read");
+		exit(EXIT_FAILURE);
+	}   
 }
