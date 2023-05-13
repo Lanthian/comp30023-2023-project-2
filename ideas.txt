@@ -1,0 +1,3 @@
+store function handlers in server in array of size 10.
+    Give handles singular detail (int index regarding where function is in server array)
+    Pass this int to tell server which function to call

@@ -20,7 +20,7 @@ int main(int argc, char *argv[]) {
     }
 
     for (int i = 0; i < 1; i++) {
-        print_server_handle(server);
+        rpc_print_handle(get_server_handle(server));
     }
 
     // todo - check if rpc_register done properly
@@ -46,7 +46,7 @@ int main(int argc, char *argv[]) {
 /* Adds 2 signed 8 bit numbers */
 /* Uses data1 for left operand, data2 for right operand */
 rpc_data *add2_i8(rpc_data *in) {
-    printf("Getting in here is a good sign");
+    printf("--FUNCTION ADD2_I8 CALLED--\n");
     /* Check data2 */
     if (in->data2 == NULL || in->data2_len != 1) {
         return NULL;

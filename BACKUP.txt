@@ -1,0 +1,41 @@
+rpc_print_data: (1)
+
+    // char data2_buffer[data->data2_len + 1];
+    // strcpy(data2_buffer, (char*)data->data2);
+    // data2_buffer[data->data2_len] = '\0';
+    // // snprintf(data2_buffer, payload->data2_len, "%d", )
+    // printf("-%p\n", data->data2);
+    // printf("--%s\n", (char*)data->data2);
+
+    // printf("---");
+    // unsigned char ptr2[data->data2_len];
+    // unsigned char *ptr = data->data2;
+    // // printf("============= %s\n", ptr);
+    // for (int i = 0; i < data->data2_len; i++) {
+    //     printf("%02x ", (char)ptr[i]);
+    //     data2_buffer[i] = (char)ptr[i];
+    //     ptr2[i] = ((char *)data->data2)[i];
+    // }
+    // ptr2[data->data2_len] = '\0';
+    // printf("\n");
+    // void* unkow = ptr;
+    // printf("/%p\n", unkow);
+    // printf("//%s\n", (char*)unkow);
+    // printf("\\\\%s\n", ptr2);
+    
+    // printf("...%s\n", data2_buffer);
+
+rpc_print_data: (2)
+
+    // char data1_buffer[MAX_INT_LENGTH];
+    // snprintf(data1_buffer, MAX_INT_LENGTH, "%d", data->data1);
+    // printf("data1: %s\n", data1_buffer);
+
+    // char data2_len[MAX_INT_LENGTH];
+    // snprintf(data2_len, MAX_INT_LENGTH, "%d", (int)data->data2_len);
+    // printf("data2_len: %s\n", data2_len);
+
+    // if (data->data2_len > 0) {
+    //     unsigned char *data2_char = data->data2;
+    //     printf("data2: %s\n", data2_char);
+    // }
