@@ -39,3 +39,59 @@ rpc_print_data: (2)
     //     unsigned char *data2_char = data->data2;
     //     printf("data2: %s\n", data2_char);
     // }
+
+
+
+
+
+------------------
+rpc_serve_all:
+    // // ========================================================================
+    // // temp change to test read-write
+    // char buffer[256];
+    // // Read characters from the connection, then process
+	// int n = read(srv->newsockfd, buffer, 255); // n is number of characters read
+	// if (n < 0) {
+	// 	perror("read");
+	// 	exit(EXIT_FAILURE);
+	// }
+	// // Null-terminate string
+	// buffer[n] = '\0';
+
+	// // Write message back
+	// printf("Here is the message: %s\n", buffer);
+	// n = write(srv->newsockfd, "I got your message\n", 19);
+	// if (n < 0) {
+	// 	perror("write");
+	// 	exit(EXIT_FAILURE);
+	// }
+    // // ........................................................................
+
+client.c (main):
+    // // ========================================================================
+    // // temp change to test read-write
+    // char buffer[256];
+    // // Read message from stdin
+	// printf("Please enter the message: ");
+	// if (fgets(buffer, 255, stdin) == NULL) {
+	// 	exit(EXIT_SUCCESS);
+	// }
+	// // Remove \n that was read by fgets
+	// buffer[strlen(buffer) - 1] = 0;
+
+    // // Send message to server
+	// int n = write(return_sockfd(client), buffer, strlen(buffer));
+	// if (n < 0) {
+	// 	perror("socket");
+	// 	exit(EXIT_FAILURE);
+	// }    
+    // // Read message from server
+	// n = read(return_sockfd(client), buffer, 255);
+	// if (n < 0) {
+	// 	perror("read");
+	// 	exit(EXIT_FAILURE);
+	// }
+	// // Null-terminate string
+	// buffer[n] = '\0';
+	// printf("%s\n", buffer);
+    // // ........................................................................

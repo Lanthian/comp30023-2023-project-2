@@ -16,6 +16,7 @@ int main(int argc, char *argv[]) {
         printf("Not enough arguments\n");
     } 
     printf("IP: %s\n", argv[1]);
+    // todo -- actually set IP to read in value
 
 
     rpc_client *client = rpc_init_client(argv[1], PORT_NUM);       // todo take these values from command line
@@ -23,37 +24,6 @@ int main(int argc, char *argv[]) {
         printf("rpc_init_client return fail.\n");
         exit(EXIT_FAILURE);
     }
-
-
-    printf("1.5\n");
-    // // ========================================================================
-    // // temp change to test read-write
-    // char buffer[256];
-    // // Read message from stdin
-	// printf("Please enter the message: ");
-	// if (fgets(buffer, 255, stdin) == NULL) {
-	// 	exit(EXIT_SUCCESS);
-	// }
-	// // Remove \n that was read by fgets
-	// buffer[strlen(buffer) - 1] = 0;
-
-    // // Send message to server
-	// int n = write(return_sockfd(client), buffer, strlen(buffer));
-	// if (n < 0) {
-	// 	perror("socket");
-	// 	exit(EXIT_FAILURE);
-	// }    
-    // // Read message from server
-	// n = read(return_sockfd(client), buffer, 255);
-	// if (n < 0) {
-	// 	perror("read");
-	// 	exit(EXIT_FAILURE);
-	// }
-	// // Null-terminate string
-	// buffer[n] = '\0';
-	// printf("%s\n", buffer);
-    // // ........................................................................
-
 
     printf("2\n");
     rpc_handle *handle_add2 = rpc_find(client, "add2");
