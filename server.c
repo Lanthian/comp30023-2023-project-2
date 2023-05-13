@@ -25,6 +25,15 @@ int main(int argc, char *argv[]) {
 
     // todo - check if rpc_register done properly
 
+    // temp - testing add2
+    char left_operand = 13;             // i
+    char right_operand = 101;           // 100
+    rpc_data request_data = {
+        .data1 = left_operand, .data2_len = 1, .data2 = &right_operand};
+    
+    print_data(&request_data);
+    print_data(add2_i8(&request_data));
+
 
     printf("Serving all right now:\n");
     rpc_serve_all(server);

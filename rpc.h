@@ -80,5 +80,6 @@ void print_server_handle(rpc_server *server);
 // temp 2023.05.13
 void rpc_send_data(int socket, rpc_data *data);
 rpc_data *rpc_receive_data(int socket);
+void print_data(rpc_data *data);
 
 #endif

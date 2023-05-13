@@ -68,8 +68,8 @@ int main(int argc, char *argv[]) {
 
     for (int i = 0; i < 2; i++) {
         /* Prepare request */
-        char left_operand = i;
-        char right_operand = 100;
+        char left_operand = 13;             // i
+        char right_operand = 101;           // 100
         rpc_data request_data = {
             .data1 = left_operand, .data2_len = 1, .data2 = &right_operand};
 

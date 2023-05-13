@@ -11,7 +11,7 @@
 
 
 #define MAX_FUNC_LENGTH 1000
-#define MAX_HANDLE_LENGTH 10
+#define MAX_INT_LENGTH 10
 
 struct rpc_server {
     /* Variable(s) for server state */
@@ -233,11 +233,11 @@ void rpc_serve_all(rpc_server *srv) {
     printf("um..\n");
 
     // Write message back
-    char id[MAX_HANDLE_LENGTH];
-    snprintf(id, MAX_HANDLE_LENGTH, "%d", 42);
+    char id[MAX_INT_LENGTH];
+    snprintf(id, MAX_INT_LENGTH, "%d", 42);
 
 	printf("Function %s requested.\n", func_name);
-	n = write(srv->newsockfd, id, MAX_HANDLE_LENGTH);
+	n = write(srv->newsockfd, id, MAX_INT_LENGTH);
 	if (n < 0) {
 		perror("write");
 		exit(EXIT_FAILURE);
@@ -340,7 +340,7 @@ rpc_handle *rpc_find(rpc_client *cl, char *name) {
     // handle->function_name = NULL;
 
     // todo / temp
-    char buffer[MAX_HANDLE_LENGTH];           // allowing up to 10 decimal digit int IDs
+    char buffer[MAX_INT_LENGTH];           // allowing up to 10 decimal digit int IDs
     // Send name to server
     printf("ccc\n");
     int n = write(cl->sockfd, name, strlen(name));
@@ -350,7 +350,7 @@ rpc_handle *rpc_find(rpc_client *cl, char *name) {
     }
     printf("ddd\n");
     // Read handle ID to construct handle from server
-    n = read(cl->sockfd, buffer, MAX_HANDLE_LENGTH-1);
+    n = read(cl->sockfd, buffer, MAX_INT_LENGTH-1);
     if (n < 0) {
         perror("read");
         exit(EXIT_FAILURE);
@@ -386,6 +386,8 @@ rpc_data *rpc_call(rpc_client *cl, rpc_handle *h, rpc_data *payload) {
 		exit(EXIT_FAILURE);
 	}   
     printf("Wrote function call for function [%s] to server\n", handle_id);
+
+    rpc_send_data(cl->sockfd, payload);
 
     return NULL;
 
@@ -425,17 +427,43 @@ void print_server_handle(rpc_server *server) {
     printf(">> %p\n", server->handle->function);
 }
 
-void rpc_send_data(int socket, rpc_data *data) {
+void rpc_send_data(int socket, rpc_data *payload) {
     // write to a socket, translate data (via buffer and conversion) to string / byte format first.
     // different errors for each stage that can fail.
+    if (payload == NULL) {
+        printf("Error: No data.\n");
+        exit(EXIT_FAILURE);
+    }
 
 
-    char int_buffer[10];
-    char data_2_len[10];
+    char data1_buffer[MAX_INT_LENGTH];
+    snprintf(data1_buffer, MAX_INT_LENGTH, "%d", payload->data1);
+    printf(".%s\n", data1_buffer);
+
+    char data2_len[MAX_INT_LENGTH];
+    snprintf(data2_len, MAX_INT_LENGTH, "%d", (int)payload->data2_len);
+    printf("..%s\n", data2_len);
+
+    char data2_buffer[payload->data2_len];
+    strcpy(data2_buffer, (char*)payload->data2);
+    // snprintf(data2_buffer, payload->data2_len, "%d", )
+    printf("-%p\n", payload->data2);
+    printf("--%s\n", (char*)payload->data2);
+ 
+    printf("---");
+    unsigned char *ptr = payload->data2;
+    for (int i = 0; i < 8; i++) {
+        printf("%02x ", (int)ptr[i]);
+    }
+    printf("\n");
+
+    printf("...%s\n", data2_buffer);
 
 
 
-    int n = read(socket, int_buffer, 10);
+
+
+    int n = write(socket, data1_buffer, MAX_INT_LENGTH);
 	if (n < 0) {
 		perror("read");
 		exit(EXIT_FAILURE);
@@ -447,14 +475,61 @@ rpc_data *rpc_receive_data(int socket) {
     // malloc an rpc_data (can be moved to where this is called instead I guess)
     // remember to free this malloc later
 
-    rpc_data *data = malloc(sizeof(data))
+    // rpc_data *data = malloc(sizeof(data));
 
-    char int_buffer[10];
-    char data_2_len[10];
+    char data1_buffer[MAX_INT_LENGTH];
+    char data_2_len[MAX_INT_LENGTH];
+    char data2_buffer[MAX_INT_LENGTH];
 
-    int n = read(socket, int_buffer, 10);
+    int n = read(socket, data1_buffer, MAX_INT_LENGTH);
 	if (n < 0) {
 		perror("read");
 		exit(EXIT_FAILURE);
 	}   
+
+    printf("--> %s\n", data1_buffer);    
+}
+
+void print_data(rpc_data *data) {
+    printf("__________________________________\n");
+    char data1_buffer[MAX_INT_LENGTH];
+    snprintf(data1_buffer, MAX_INT_LENGTH, "%d", data->data1);
+    printf("data1: %s\n", data1_buffer);
+
+    char data2_len[MAX_INT_LENGTH];
+    snprintf(data2_len, MAX_INT_LENGTH, "%d", (int)data->data2_len);
+    printf("data2_len: %s\n", data2_len);
+
+    if (data->data2_len > 0) {
+        unsigned char *data2_char = data->data2;
+        printf("data2: %s\n", data2_char);
+        // char data2_buffer[data->data2_len + 1];
+        // strcpy(data2_buffer, (char*)data->data2);
+        // data2_buffer[data->data2_len] = '\0';
+        // // snprintf(data2_buffer, payload->data2_len, "%d", )
+        // printf("-%p\n", data->data2);
+        // printf("--%s\n", (char*)data->data2);
+    
+        // printf("---");
+        // unsigned char ptr2[data->data2_len];
+        // unsigned char *ptr = data->data2;
+        // // printf("============= %s\n", ptr);
+        // for (int i = 0; i < data->data2_len; i++) {
+        //     printf("%02x ", (char)ptr[i]);
+        //     data2_buffer[i] = (char)ptr[i];
+        //     ptr2[i] = ((char *)data->data2)[i];
+        // }
+        // ptr2[data->data2_len] = '\0';
+        // printf("\n");
+        // void* unkow = ptr;
+        // printf("/%p\n", unkow);
+        // printf("//%s\n", (char*)unkow);
+        // printf("\\\\%s\n", ptr2);
+
+
+
+        // printf("...%s\n", data2_buffer);
+    }
+    // printf("==================================\n");
+    printf("``````````````````````````````````\n");
 }
