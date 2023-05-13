@@ -26,3 +26,8 @@ client: client.o $(RPC_SYSTEM)
 
 format:
 	clang-format -style=file -i *.c *.h
+
+
+clean:
+	rm *.o
+	rm server client
