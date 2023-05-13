@@ -31,8 +31,9 @@ int main(int argc, char *argv[]) {
     rpc_data request_data = {
         .data1 = left_operand, .data2_len = 1, .data2 = &right_operand};
     
-    print_data(&request_data);
-    print_data(add2_i8(&request_data));
+    // rpc_print_data(&request_data);
+    // rpc_print_data(add2_i8(&request_data));
+    test_func_handle(server, &request_data);
 
 
     printf("Serving all right now:\n");
@@ -45,6 +46,7 @@ int main(int argc, char *argv[]) {
 /* Adds 2 signed 8 bit numbers */
 /* Uses data1 for left operand, data2 for right operand */
 rpc_data *add2_i8(rpc_data *in) {
+    printf("Getting in here is a good sign");
     /* Check data2 */
     if (in->data2 == NULL || in->data2_len != 1) {
         return NULL;

@@ -115,7 +115,7 @@ int rpc_register(rpc_server *srv, char *name, rpc_handler handler) {
 
     srv->handle->handle_id = 12;                // todo / temp
     strcpy(srv->handle->function_name, name);
-    srv->handle->function = NULL;                // todo handler
+    srv->handle->function = handler;                // todo handler
 
     return REGISTER_SUCCESS;
 }
@@ -490,7 +490,7 @@ rpc_data *rpc_receive_data(int socket) {
     printf("--> %s\n", data1_buffer);    
 }
 
-void print_data(rpc_data *data) {
+void rpc_print_data(rpc_data *data) {
     printf("__________________________________\n");
     char data1_buffer[MAX_INT_LENGTH];
     snprintf(data1_buffer, MAX_INT_LENGTH, "%d", data->data1);
@@ -532,4 +532,13 @@ void print_data(rpc_data *data) {
     }
     // printf("==================================\n");
     printf("``````````````````````````````````\n");
+}
+
+void test_func_handle(rpc_server *srv, rpc_data *data) {
+    rpc_print_data(data);
+
+    printf("function handle: %p\n",srv->handle->function);
+    printf("function name: %s\n", srv->handle->function_name);
+
+    rpc_print_data((srv->handle->function)(data));
 }
