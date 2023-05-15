@@ -12,6 +12,7 @@
 
 #define MAX_FUNC_LENGTH 1000
 #define MAX_INT_LENGTH 11       // Includes space for a '\0' terminator
+#define MAX_HANDLES 10
 
 struct rpc_server {
     /* Variable(s) for server state */
@@ -23,7 +24,7 @@ struct rpc_server {
     socklen_t client_addr_size;
 
     // everything below here needs to be freed at some point
-    rpc_handle* handle;
+    rpc_handle* handles[MAX_HANDLES]
 };
 
 rpc_server *rpc_init_server(int port) {
@@ -32,7 +33,9 @@ rpc_server *rpc_init_server(int port) {
 
     rpc_server *server = malloc(sizeof(rpc_server));
     if (server == NULL) return NULL;            // Failed to allocate memory
-    server->handle = NULL;          // todo --- will cause you a problem later hahha
+    for (int i = 0; i<MAX_HANDLES; i++) {
+        server->handles[i] = NULL;
+    }
     
 
     // Given memory allocation is successful begin initiation
@@ -103,9 +106,17 @@ int rpc_register(rpc_server *srv, char *name, rpc_handler handler) {
     // Check name length
     if (strlen(name) <= 0 || strlen(name) > MAX_FUNC_LENGTH) return -1;
 
+    // Find available handle spot in 
+    int index = -1;
+    for (int i = 0; i<MAX_HANDLES; i++) {
+        if (srv->handles[i] == NULL) {
+            index = i;
+            break;
+        }
+    }
 
     // Malloc and assign handle to server           // -- todo, change this to array
-    srv->handle = malloc(sizeof(rpc_handle));
+    srv->handles[i] = malloc(sizeof(rpc_handle));
     if (srv->handle == NULL) {
         // no room in memory for malloc
         return -1;
