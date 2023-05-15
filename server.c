@@ -33,7 +33,7 @@ int main(int argc, char *argv[]) {
     
     // rpc_print_data(&request_data);
     // rpc_print_data(add2_i8(&request_data));
-    test_func_handle(server, &request_data);
+    // test_func_handle(server, &request_data);
 
 
     printf("Serving all right now:\n");

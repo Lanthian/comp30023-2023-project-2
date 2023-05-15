@@ -9,6 +9,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#include <assert.h>
+
 
 #define MAX_FUNC_LENGTH 1000
 #define MAX_INT_LENGTH 11       // Includes space for a '\0' terminator
@@ -24,7 +26,7 @@ struct rpc_server {
     socklen_t client_addr_size;
 
     // everything below here needs to be freed at some point
-    rpc_handle* handles[MAX_HANDLES]
+    rpc_handle* handles[MAX_HANDLES];
 };
 
 rpc_server *rpc_init_server(int port) {
@@ -115,19 +117,23 @@ int rpc_register(rpc_server *srv, char *name, rpc_handler handler) {
         }
     }
 
+    // Abort registration and parse back error if unsucessful
+    if (index == -1) return -1;
+
     // Malloc and assign handle to server           // -- todo, change this to array
-    srv->handles[i] = malloc(sizeof(rpc_handle));
-    if (srv->handle == NULL) {
+    srv->handles[index] = malloc(sizeof(rpc_handle));
+    if (srv->handles[index] == NULL) {
         // no room in memory for malloc
-        return -1;
+        printf("No memory for malloc.\n");
+        exit(EXIT_FAILURE);
     }
 
+    // Allocate details to handle, returning handle index (ID)
+    srv->handles[index]->handle_id = index;                 // Done for client side
+    strcpy(srv->handles[index]->function_name, name);		// Not really needed but good to hold onto
+    srv->handles[index]->function = handler;                // Function pointer for server side
 
-    srv->handle->handle_id = 12;                // todo / temp
-    strcpy(srv->handle->function_name, name);
-    srv->handle->function = handler;                // todo handler
-
-    return REGISTER_SUCCESS;
+    return index;
 }
 
 void rpc_serve_all(rpc_server *srv) {
@@ -180,21 +186,34 @@ void rpc_serve_all(rpc_server *srv) {
 
 
     // printf("compare name w/ existing function name\n");
-    // Check if handle exists           // todo - properly please lym
-    printf("Handle: %s, Searched: %s\n", srv->handle->function_name, func_name);
-    if (strcmp(srv->handle->function_name, func_name) != 0) {                   // strcmp(srv->handle->function_name, func_name)
-        // Function doesn't exist
+    printf("Searched for handle: %s\n", func_name);         // temprint
+
+    // Check if handle exists
+    int handle_index = -1;
+    for (int i=0; i<MAX_HANDLES; i++) {
+
+        // Firstly check if _a_ handle exists at index
+        if (srv->handles[i] != NULL) {
+            // Then check if it matches the name queried. 
+            if (strcmp(srv->handles[i]->function_name, func_name) == 0) {
+                // Match found
+                handle_index = i;
+                break;
+            }
+        }
+    }
+    if (handle_index == -1) {
+        // Function of searched name doesn't exist
         printf("Function %s not found.\n", func_name);
-        printf("Try %s instead.\n", srv->handle->function_name);
         return;
     }
 
     // Write message back
     char id[MAX_INT_LENGTH];
-    snprintf(id, MAX_INT_LENGTH, "%d", 42);
+    snprintf(id, MAX_INT_LENGTH, "%d", handle_index);
 
 	printf("Function %s requested. (successful)\n", func_name);
-	n = write(srv->newsockfd, id, MAX_INT_LENGTH-1);
+	n = write(srv->newsockfd, id, MAX_INT_LENGTH-1);            // todo change max int length to 3??? or 4????
 	if (n < 0) {
 		perror("write");
 		exit(EXIT_FAILURE);
@@ -208,20 +227,23 @@ void rpc_serve_all(rpc_server *srv) {
     int i = 0;
     while (1) {
         printf("===================%d===================\n", i++);
-        char func_handle[3];        // can take 0-99 handles
+        char func_handle_id[3];        // can take 0-99 handles
         
-        int n = read(srv->newsockfd, func_handle, 3);    // n is the number of characters read
+        int n = read(srv->newsockfd, func_handle_id, 3);    // n is the number of characters read      // todo fix this 3
         if (n < 0) {
             perror("read");
             exit(EXIT_FAILURE);
         }
-        func_handle[n] = '\0';
+        func_handle_id[n] = '\0';
 
-        printf("function request for id [%s] received.\n", func_handle);
+        printf("function request for id [%s] received.\n", func_handle_id);
+        int handle_id = atoi(func_handle_id);
+        assert(handle_id != -1);            // todo?
+
         // todo - thread here? Or earlier... Dunno.
         rpc_data *data = rpc_receive_data(srv->newsockfd);
         printf("data received\n");
-        rpc_send_data(srv->newsockfd, (srv->handle->function)(data));
+        rpc_send_data(srv->newsockfd, (srv->handles[handle_id]->function)(data));
 
         // Free data, as malloced in rpc_receive_data
         rpc_data_free(data);
@@ -295,8 +317,8 @@ rpc_handle *rpc_find(rpc_client *cl, char *name) {
 
     // Fill temporary values for handle
     handle->handle_id = -1;
-    handle->function = NULL;
-    // handle->function_name = name;        // -- fix issue here
+    handle->function = NULL;				// Client doesn't need access to server side function pointer
+    // handle->function_name = name;        // -- todo fix issue here
 
 
     // Send function name to server
@@ -327,7 +349,7 @@ rpc_handle *rpc_find(rpc_client *cl, char *name) {
 
     // Otherwise search was successful. Return handle object.
     handle->handle_id = x;
-    printf("prc_find is fine?\n");              // temprint
+    printf("prc_find is fine?\n");              // temprint	todo
     return handle;
 }
 
@@ -335,7 +357,7 @@ rpc_handle *rpc_find(rpc_client *cl, char *name) {
 
 rpc_data *rpc_call(rpc_client *cl, rpc_handle *h, rpc_data *payload) {
     char handle_id[temp];
-    snprintf(handle_id, temp, "%d", 23);
+    snprintf(handle_id, temp, "%d", h->handle_id);
 
     int n = write(cl->sockfd, handle_id, temp);
     if (n < 0) {
@@ -505,9 +527,9 @@ rpc_data *rpc_receive_data(int socket) {
     return return_data;
 }
 
-rpc_handle *get_server_handle(rpc_server *srv) {
-    return (srv->handle);
-}
+// rpc_handle *get_server_handle(rpc_server *srv) {
+//     return (srv->handle);
+// }
 
 void rpc_print_handle(rpc_handle *handle) {
     printf("handle_id: %d\n", handle->handle_id);
@@ -523,13 +545,13 @@ void rpc_print_data(rpc_data *data) {
     printf("``````````````````````````````````\n");
 }
 
-// Print rpc_data before and after an operation of srv->handle.
-void test_func_handle(rpc_server *srv, rpc_data *data) {
-    // Print initial data
-    rpc_print_data(data);
-    // Print operation details
-    rpc_handle *func = get_server_handle(srv);
-    rpc_print_handle(func);
-    // Print operated on data
-    rpc_print_data((func->function)(data));
-}
+// // Print rpc_data before and after an operation of srv->handle.
+// void test_func_handle(rpc_server *srv, rpc_data *data) {
+//     // Print initial data
+//     rpc_print_data(data);
+//     // Print operation details
+//     rpc_handle *func = get_server_handle(srv);
+//     rpc_print_handle(func);
+//     // Print operated on data
+//     rpc_print_data((func->function)(data));
+// }
