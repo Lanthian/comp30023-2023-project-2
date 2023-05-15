@@ -27,7 +27,6 @@ struct rpc_server {
 };
 
 rpc_server *rpc_init_server(int port) {
-    printf("a\n");
     char port_str[6];
     sprintf(port_str, "%d", port);
 
@@ -81,8 +80,6 @@ rpc_server *rpc_init_server(int port) {
     }
 
     // Given listen is successful, return server (not yet blocked)
-    printf("b\n");
-
 	return server;
 
 cleanup:
@@ -214,6 +211,10 @@ void rpc_serve_all(rpc_server *srv) {
         rpc_data *data = rpc_receive_data(srv->newsockfd);
         printf("data received\n");
         rpc_send_data(srv->newsockfd, (srv->handle->function)(data));
+
+        // Free data, as malloced in rpc_receive_data
+        rpc_data_free(data);
+        data = NULL;
         
         // break;
     }
@@ -270,7 +271,6 @@ rpc_client *rpc_init_client(char *addr, int port) {
     freeaddrinfo(servinfo);
 
     // Otherwise return successfully linked client
-    printf("ii\n");
     return client;
 }
 
@@ -316,7 +316,7 @@ rpc_handle *rpc_find(rpc_client *cl, char *name) {
 
     // Otherwise search was successful. Return handle object.
     handle->handle_id = x;
-    printf("prc_find is fine?\n");
+    printf("prc_find is fine?\n");              // temprint
     return handle;
 }
 

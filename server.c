@@ -19,9 +19,9 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    for (int i = 0; i < 1; i++) {
-        rpc_print_handle(get_server_handle(server));
-    }
+    // for (int i = 0; i < 1; i++) {
+    //     rpc_print_handle(get_server_handle(server));
+    // }        // temprint
 
     // todo - check if rpc_register done properly
 

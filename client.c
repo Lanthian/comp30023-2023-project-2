@@ -11,9 +11,10 @@
 int main(int argc, char *argv[]) {
     int exit_code = 0;
 
-    printf("1\n");
+    // printf("1\n");           // temprint
     if (argc < 2) {
         printf("Not enough arguments\n");
+        exit(EXIT_SUCCESS);
     } 
     printf("IP: %s\n", argv[1]);
     // todo -- actually set IP to read in value
@@ -25,7 +26,7 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    printf("2\n");
+    // printf("2\n");           // temprint
     rpc_handle *handle_add2 = rpc_find(client, "add2");
     if (handle_add2 == NULL) {
         fprintf(stderr, "ERROR: Function add2 does not exist\n");
@@ -33,7 +34,7 @@ int main(int argc, char *argv[]) {
         goto cleanup;
     }
 
-    printf("3 (using handle_add2 = %p)\n", handle_add2);
+    // printf("3 (using handle_add2 = %p)\n", handle_add2);         // temprint
     // return -1;
 
     for (int i = 0; i < 2; i++) {
