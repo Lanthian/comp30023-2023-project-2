@@ -6,9 +6,17 @@
 rpc_data *add2_i8(rpc_data *);
 
 int main(int argc, char *argv[]) {
-    rpc_server *server;
+    // Check enough arguments have been read in to instantiate client.
+    if (argc < 2) {
+        printf("Not enough arguments. \n\tFormat: ./server port_num\n"); // todo properly
+        exit(EXIT_SUCCESS);
+    } 
 
-    server = rpc_init_server(PORT_NUM);
+    // Temporary declaration here, just for cohesion of code
+    int port_num = atoi(argv[1]);
+
+
+    rpc_server *server = rpc_init_server(port_num);
     if (server == NULL) {
         fprintf(stderr, "Failed to init\n");
         exit(EXIT_FAILURE);

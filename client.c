@@ -11,16 +11,19 @@
 int main(int argc, char *argv[]) {
     int exit_code = 0;
 
-    // printf("1\n");           // temprint
-    if (argc < 2) {
-        printf("Not enough arguments\n");
+    // Check enough arguments have been read in to instantiate client.
+    if (argc < 3) {
+        printf("Not enough arguments. \n\tFormat: ./server server_ip_address port_num\n");
         exit(EXIT_SUCCESS);
     } 
-    printf("IP: %s\n", argv[1]);
-    // todo -- actually set IP to read in value
+
+    // Temporary declaration here, just for cohesion of code
+    char *ip_address = argv[1];
+    int port_num = atoi(argv[2]);
+    printf("IP: %s, Port: %d\n", ip_address, port_num);
 
 
-    rpc_client *client = rpc_init_client(argv[1], PORT_NUM);       // todo take these values from command line
+    rpc_client *client = rpc_init_client(ip_address, port_num);       // todo take these values from command line
     if (client == NULL) {
         printf("rpc_init_client return fail.\n");
         exit(EXIT_FAILURE);

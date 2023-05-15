@@ -6,7 +6,6 @@
 
 #include <stddef.h>
 
-#define PORT_NUM 3000
 #define REGISTER_SUCCESS 1
 
 /* Server state */
