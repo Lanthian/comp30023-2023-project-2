@@ -22,6 +22,16 @@
 
 #define NO_SOCKET -3
 
+#define SERVER_FLAG_BUFFER 2
+// 0 reserved, as read flag fails return 0
+#define SERVER_FLAG_FIND 1
+#define SERVER_FLAG_CALL 2
+
+void rpc_send_data(int socket, rpc_data *payload);
+rpc_data *rpc_read_data(int socket);
+int rpc_send_flag(int socket, int flag);
+int rpc_read_flag(int socket);
+
 struct rpc_server {
     /* Variable(s) for server state */
     int newsockfd;
@@ -205,6 +215,7 @@ void rpc_serve_all(rpc_server *srv) {
         printf("New connection from %s:%d on socket %d\n", ip, port, srv->newsockfd);
         
 
+        rpc_read_flag(srv->newsockfd);
         printf("Read in function call\n");
 
         // Read in function call requests
@@ -259,6 +270,7 @@ void rpc_serve_all(rpc_server *srv) {
         printf("===============================\n");
         int i = 0;
         while (1) {
+            rpc_read_flag(srv->newsockfd);
             printf("===================%d===================\n", i++);
             char func_handle_id[MAX_HANDLE_ID_LENGTH];        // can take 0-99 handles
             
@@ -282,11 +294,11 @@ void rpc_serve_all(rpc_server *srv) {
             assert(handle_id != -1);            // todo?
 
             // todo - thread here? Or earlier... Dunno.
-            rpc_data *data = rpc_receive_data(srv->newsockfd);
+            rpc_data *data = rpc_read_data(srv->newsockfd);
             printf("data received\n");
             rpc_send_data(srv->newsockfd, (srv->handles[handle_id]->function)(data));
 
-            // Free data, as malloced in rpc_receive_data
+            // Free data, as malloced in rpc_read_data
             rpc_data_free(data);
             data = NULL;
             
@@ -353,6 +365,44 @@ rpc_client *rpc_init_client(char *addr, int port) {
     return client;
 }
 
+/* 
+  Shorthand function to send (int) flags to a socket adress. Returns the number
+  of bytes sent (should be < SERVER_FLAG_BUFFER, > 0)
+*/
+int rpc_send_flag(int socket, int flag) {
+    // Convert data1 (int) and data2_len (size_t) to char*
+    char flag_buffer[SERVER_FLAG_BUFFER];
+    snprintf(flag_buffer, SERVER_FLAG_BUFFER, "%d", flag);
+
+    int n = write(socket, flag_buffer, SERVER_FLAG_BUFFER-1);
+    if (n < 0) {
+        perror("write");
+        exit(EXIT_FAILURE);
+    }
+
+    return n;
+} 
+
+/* 
+  Shorthand function to read (char*) flags from a socket adress. Returns the 
+  flag as an int.
+*/
+int rpc_read_flag(int socket) {
+    // Initiate buffers to read in rpc_data fields
+    char flag_buffer[SERVER_FLAG_BUFFER];
+
+    // Read in flag
+    int n = read(socket, flag_buffer, SERVER_FLAG_BUFFER-1);
+	if (n < 0) {
+		perror("read");
+		exit(EXIT_FAILURE);
+	}   
+    flag_buffer[n] = '\0';
+
+    // Convert and return flag
+    return atoi(flag_buffer);
+}
+
 rpc_handle *rpc_find(rpc_client *cl, char *name) {
     // Malloc space to return a handle
     rpc_handle *handle = malloc(sizeof(rpc_handle));
@@ -366,6 +416,9 @@ rpc_handle *rpc_find(rpc_client *cl, char *name) {
     handle->function = NULL;				// Client doesn't need access to server side function pointer
     // handle->function_name = name;        // -- todo fix issue here
 
+
+    // Send flag to server to let it know rpc_find has been called
+    rpc_send_flag(cl->sockfd, SERVER_FLAG_FIND);
 
     // Send function name to server
     int n = write(cl->sockfd, name, strlen(name));
@@ -401,9 +454,15 @@ rpc_handle *rpc_find(rpc_client *cl, char *name) {
 // todo - deal with inconsistencies of read write length? (-1 issue)
 
 rpc_data *rpc_call(rpc_client *cl, rpc_handle *h, rpc_data *payload) {
+    // Convert handle_id to char* for sending
     char handle_id[MAX_HANDLE_ID_LENGTH];
     snprintf(handle_id, MAX_HANDLE_ID_LENGTH, "%d", h->handle_id);
 
+    // Send flag to server to let it know rpc_call has been called
+    rpc_send_flag(cl->sockfd, SERVER_FLAG_CALL);
+
+
+    // Write handle id to server before sending data
     int n = write(cl->sockfd, handle_id, MAX_HANDLE_ID_LENGTH);
     if (n < 0) {
 		perror("write");
@@ -413,7 +472,7 @@ rpc_data *rpc_call(rpc_client *cl, rpc_handle *h, rpc_data *payload) {
 
     rpc_send_data(cl->sockfd, payload);
     // printf("Sent data to server\n");      // temprint
-    return rpc_receive_data(cl->sockfd);
+    return rpc_read_data(cl->sockfd);
 
 }
 
@@ -499,7 +558,7 @@ void rpc_send_data(int socket, rpc_data *payload) {
     // printf("-- DATA HAS BEEN SENT --\n");      // temprint
 }
 
-rpc_data *rpc_receive_data(int socket) {
+rpc_data *rpc_read_data(int socket) {
     // read from a socket, translate data (via buffer and conversion, etc.) back to ideal data
     // malloc an rpc_data (can be moved to where this is called instead I guess)
     // remember to free this malloc later
