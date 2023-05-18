@@ -213,7 +213,7 @@ void rpc_serve_all(rpc_server *srv) {
 
 
         port = ntohs(srv->client_addr.sin_port);
-        // printf("New connection from %s:%d on socket %d\n", ip, port, srv->newsockfd);        // temprint
+        printf("New connection from %s:%d on socket %d\n", ip, port, srv->newsockfd);        // temprint
         
         while(1) {
             // Read command flag
