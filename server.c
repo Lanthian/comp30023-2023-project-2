@@ -44,9 +44,9 @@ int main(int argc, char *argv[]) {
     // test_func_handle(server, &request_data);
 
 
-    printf("Serving all right now:\n");
+    // printf("Serving all right now:\n");      // temprint
     rpc_serve_all(server);
-    printf("Somehow done serving all...?\n");
+    // printf("Somehow done serving all...?\n");        // temprint
 
     return 0;
 }
@@ -54,7 +54,7 @@ int main(int argc, char *argv[]) {
 /* Adds 2 signed 8 bit numbers */
 /* Uses data1 for left operand, data2 for right operand */
 rpc_data *add2_i8(rpc_data *in) {
-    printf("--FUNCTION ADD2_I8 CALLED--\n");
+    // printf("--FUNCTION ADD2_I8 CALLED--\n"); // temprint
     /* Check data2 */
     if (in->data2 == NULL || in->data2_len != 1) {
         return NULL;
@@ -65,7 +65,7 @@ rpc_data *add2_i8(rpc_data *in) {
     char n2 = ((char *)in->data2)[0];
 
     /* Perform calculation */
-    printf("add2: arguments %d and %d\n", n1, n2);
+    // printf("add2: arguments %d and %d\n", n1, n2);  // temprint
     int res = n1 + n2;
 
     /* Prepare response */

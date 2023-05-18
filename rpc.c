@@ -22,8 +22,9 @@
 
 #define NO_SOCKET -3
 
-#define SERVER_FLAG_BUFFER 2
-// 0 reserved, as read flag fails return 0
+#define SERVER_FLAG_BUFFER 2            // todo - rename this to something less convoluted
+// 0 reserved, as read flag fails return 0          // todo alter comment
+#define SERVER_FLAG_EMPTY 0
 #define SERVER_FLAG_FIND 1
 #define SERVER_FLAG_CALL 2
 
@@ -156,8 +157,8 @@ int rpc_register(rpc_server *srv, char *name, rpc_handler handler) {
 }
 
 void rpc_serve_all(rpc_server *srv) {
-    printf("((((((((((((((((((((((((()))))))))))))))))))))))))\n");
-    printf("---Serving!---\n");
+    // printf("((((((((((((((((((((((((()))))))))))))))))))))))))\n");      // temprint
+    // printf("---Serving!---\n");      // temprint
     // rpc_print_handle(srv->handle);
 
     struct sockaddr_in client_addr;
@@ -195,7 +196,7 @@ void rpc_serve_all(rpc_server *srv) {
         // Otherwise, Child process - serve client
     
 
-        printf("CONNECTION ESTABLISHED!!!\n");
+        // printf("CONNECTION ESTABLISHED!!!\n");           // temprint
         // todo - threading here
 
 
@@ -212,100 +213,111 @@ void rpc_serve_all(rpc_server *srv) {
 
 
         port = ntohs(srv->client_addr.sin_port);
-        printf("New connection from %s:%d on socket %d\n", ip, port, srv->newsockfd);
+        // printf("New connection from %s:%d on socket %d\n", ip, port, srv->newsockfd);        // temprint
         
+        while(1) {
+            // Read command flag
+            int flag = rpc_read_flag(srv->newsockfd);
+            int n;
 
-        rpc_read_flag(srv->newsockfd);
-        printf("Read in function call\n");
+            // printf("flag: %d\n", flag);      // temprint
+            
+            switch(flag){
+                // rpc_find:
+                case SERVER_FLAG_FIND:
+                    // Read in function handle name (to be searched for)
+                    char func_name[MAX_FUNC_NAME_LENGTH];
+                    n = read(srv->newsockfd, func_name, MAX_FUNC_NAME_LENGTH-1);    // n is the number of characters read
+                    if (n < 0) {
+                        perror("read");
+                        exit(EXIT_FAILURE);
+                    }
+                    func_name[n] = '\0';    // null terminate read data
 
-        // Read in function call requests
-        char func_name[MAX_FUNC_NAME_LENGTH];
-        int n = read(srv->newsockfd, func_name, MAX_FUNC_NAME_LENGTH-1);    // n is the number of characters read
-        if (n < 0) {
-            perror("read");
-            exit(EXIT_FAILURE);
-        }
-        // Null-terminate string
-        func_name[n] = '\0';
+                    // printf("compare name w/ existing function name\n");
+                    // printf("Searched for handle: %s\n", func_name);         // temprint
 
+                    // Check if handle exists
+                    int handle_index = -1;
+                    for (int i=0; i<MAX_HANDLES; i++) {
 
-        // printf("compare name w/ existing function name\n");
-        printf("Searched for handle: %s\n", func_name);         // temprint
+                        // Firstly check if _a_ handle exists at index
+                        if (srv->handles[i] != NULL) {
+                            // Then check if it matches the name queried. 
+                            if (strcmp(srv->handles[i]->function_name, func_name) == 0) {
+                                // Match found
+                                handle_index = i;
+                                break;
+                            }
+                        }
+                    }
+                    if (handle_index == -1) {
+                        // Function of searched name doesn't exist
+                        // printf("Function %s not found.\n", func_name);       // temprint
+                        return;
+                    }
 
-        // Check if handle exists
-        int handle_index = -1;
-        for (int i=0; i<MAX_HANDLES; i++) {
+                    // Write message back
+                    char id[MAX_HANDLE_ID_LENGTH];
+                    snprintf(id, MAX_HANDLE_ID_LENGTH, "%d", handle_index);
 
-            // Firstly check if _a_ handle exists at index
-            if (srv->handles[i] != NULL) {
-                // Then check if it matches the name queried. 
-                if (strcmp(srv->handles[i]->function_name, func_name) == 0) {
-                    // Match found
-                    handle_index = i;
+                    // printf("Function %s requested. (successful)\n", func_name);      // temprint
+                    n = write(srv->newsockfd, id, MAX_HANDLE_ID_LENGTH-1);            // todo change max int length to 3??? or 4????
+                    if (n < 0) {
+                        perror("write");
+                        exit(EXIT_FAILURE);
+                    }   
                     break;
-                }
+
+
+                // rpc_call:
+                case SERVER_FLAG_CALL:
+                    // Read in function handle_id (index in handles array)
+                    char func_handle_id[MAX_HANDLE_ID_LENGTH];        // can take 0-99 handles
+                    n = read(srv->newsockfd, func_handle_id, MAX_HANDLE_ID_LENGTH);    // n is the number of characters read      // todo fix this 3
+                    if (n < 0) {
+                        perror("read");
+                        exit(EXIT_FAILURE);
+                    }
+                    func_handle_id[n] = '\0';   // null terminate read data
+
+                    // Check if no function call sent (and in turn server end for client reached)
+                    if (n == 0) {
+                        printf("End of server reached. - don't want to ever see this again\n");    // todo remove  
+                        // todo - clean server thread up
+                        close(srv->newsockfd);
+                        break;
+                    }
+
+                    // printf("function request for id [%s] received.\n", func_handle_id);      // temprint
+                    int handle_id = atoi(func_handle_id);
+                    assert(handle_id != -1);            // todo?
+
+                    // todo - thread here? Or earlier... Dunno.
+                    rpc_data *data = rpc_read_data(srv->newsockfd);
+                    // printf("data received\n");       // temprint
+                    rpc_send_data(srv->newsockfd, (srv->handles[handle_id]->function)(data));
+
+                    // Free data, as malloced in rpc_read_data
+                    rpc_data_free(data);
+                    data = NULL;
+                    break;
+
+
+                // No flag sent
+                case(SERVER_FLAG_EMPTY):
+                    // printf("Done with server :)\n");     // temprint
+                    close(srv->newsockfd);
+                    return;
+
+
+                // Undeclared flag sent somehow
+                default:
+                    perror("unknown server_flag");
+                    exit(EXIT_FAILURE);
             }
+            // printf("Looping\n");     // temprint
         }
-        if (handle_index == -1) {
-            // Function of searched name doesn't exist
-            printf("Function %s not found.\n", func_name);
-            return;
-        }
-
-        // Write message back
-        char id[MAX_HANDLE_ID_LENGTH];
-        snprintf(id, MAX_HANDLE_ID_LENGTH, "%d", handle_index);
-
-        printf("Function %s requested. (successful)\n", func_name);
-        n = write(srv->newsockfd, id, MAX_HANDLE_ID_LENGTH-1);            // todo change max int length to 3??? or 4????
-        if (n < 0) {
-            perror("write");
-            exit(EXIT_FAILURE);
-        }   
-
-        // printf("No errors.\n");
-        // printf("%s", srv->handle->function_name);
-
-        printf("Try using func calls now\n");
-        printf("===============================\n");
-        int i = 0;
-        while (1) {
-            rpc_read_flag(srv->newsockfd);
-            printf("===================%d===================\n", i++);
-            char func_handle_id[MAX_HANDLE_ID_LENGTH];        // can take 0-99 handles
-            
-            int n = read(srv->newsockfd, func_handle_id, MAX_HANDLE_ID_LENGTH);    // n is the number of characters read      // todo fix this 3
-            if (n < 0) {
-                perror("read");
-                exit(EXIT_FAILURE);
-            }
-            func_handle_id[n] = '\0';
-
-            // Check if no function call sent (and in turn server end for client reached)
-            if (n == 0) {
-                printf("End of server reached.\n");
-                // todo - clean server thread up
-	            close(srv->newsockfd);
-                break;
-            }
-
-            printf("function request for id [%s] received.\n", func_handle_id);
-            int handle_id = atoi(func_handle_id);
-            assert(handle_id != -1);            // todo?
-
-            // todo - thread here? Or earlier... Dunno.
-            rpc_data *data = rpc_read_data(srv->newsockfd);
-            printf("data received\n");
-            rpc_send_data(srv->newsockfd, (srv->handles[handle_id]->function)(data));
-
-            // Free data, as malloced in rpc_read_data
-            rpc_data_free(data);
-            data = NULL;
-            
-            // break;
-        }
-        printf("Done with process - Hopefully loop here?\n");
-
     }
     // todo - cleanup (maybe a few frees too?)
     // close(srv->sockfd);
