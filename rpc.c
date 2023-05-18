@@ -12,9 +12,13 @@
 #include <assert.h>
 
 
-#define MAX_FUNC_LENGTH 1000
+#define MAX_FUNC_NAME_LENGTH 1000
 #define MAX_INT_LENGTH 11       // Includes space for a '\0' terminator
+
 #define MAX_HANDLES 10
+#define MAX_HANDLE_ID_LENGTH 3          // should maybe be 2?
+
+#define BACK_LOG 10
 
 struct rpc_server {
     /* Variable(s) for server state */
@@ -79,7 +83,7 @@ rpc_server *rpc_init_server(int port) {
 
 
     // -- Successfully initiated server socket, set to listen --
-    if (listen(server->sockfd, 10) < 0) {    // todo - find out what this number means
+    if (listen(server->sockfd, BACK_LOG) < 0) {    // todo - find out what this number means
         perror("listen");
         goto cleanup;
     }
@@ -98,7 +102,7 @@ cleanup:
 struct rpc_handle {
     /* Add variable(s) for handle */
     int handle_id;
-    char function_name[MAX_FUNC_LENGTH];
+    char function_name[MAX_FUNC_NAME_LENGTH];
     rpc_handler function;
 };
 
@@ -106,7 +110,7 @@ int rpc_register(rpc_server *srv, char *name, rpc_handler handler) {
     // Check f or null values
     if (srv == NULL || name == NULL || handler == NULL) return -1;
     // Check name length
-    if (strlen(name) <= 0 || strlen(name) > MAX_FUNC_LENGTH) return -1;
+    if (strlen(name) <= 0 || strlen(name) > MAX_FUNC_NAME_LENGTH) return -1;
 
     // Find available handle spot in 
     int index = -1;
@@ -175,8 +179,8 @@ void rpc_serve_all(rpc_server *srv) {
     printf("Read in function call\n");
 
     // Read in function call requests
-    char func_name[MAX_FUNC_LENGTH];
-    int n = read(srv->newsockfd, func_name, MAX_FUNC_LENGTH-1);    // n is the number of characters read
+    char func_name[MAX_FUNC_NAME_LENGTH];
+    int n = read(srv->newsockfd, func_name, MAX_FUNC_NAME_LENGTH-1);    // n is the number of characters read
     if (n < 0) {
         perror("read");
         exit(EXIT_FAILURE);
@@ -209,11 +213,11 @@ void rpc_serve_all(rpc_server *srv) {
     }
 
     // Write message back
-    char id[MAX_INT_LENGTH];
-    snprintf(id, MAX_INT_LENGTH, "%d", handle_index);
+    char id[MAX_HANDLE_ID_LENGTH];
+    snprintf(id, MAX_HANDLE_ID_LENGTH, "%d", handle_index);
 
 	printf("Function %s requested. (successful)\n", func_name);
-	n = write(srv->newsockfd, id, MAX_INT_LENGTH-1);            // todo change max int length to 3??? or 4????
+	n = write(srv->newsockfd, id, MAX_HANDLE_ID_LENGTH-1);            // todo change max int length to 3??? or 4????
 	if (n < 0) {
 		perror("write");
 		exit(EXIT_FAILURE);
@@ -227,14 +231,20 @@ void rpc_serve_all(rpc_server *srv) {
     int i = 0;
     while (1) {
         printf("===================%d===================\n", i++);
-        char func_handle_id[3];        // can take 0-99 handles
+        char func_handle_id[MAX_HANDLE_ID_LENGTH];        // can take 0-99 handles
         
-        int n = read(srv->newsockfd, func_handle_id, 3);    // n is the number of characters read      // todo fix this 3
+        int n = read(srv->newsockfd, func_handle_id, MAX_HANDLE_ID_LENGTH);    // n is the number of characters read      // todo fix this 3
         if (n < 0) {
             perror("read");
             exit(EXIT_FAILURE);
         }
         func_handle_id[n] = '\0';
+
+        // Check if no function call sent (and in turn server end for client reached)
+        if (n == 0) {
+            printf("End of server reached.\n");
+            break;
+        }
 
         printf("function request for id [%s] received.\n", func_handle_id);
         int handle_id = atoi(func_handle_id);
@@ -349,25 +359,24 @@ rpc_handle *rpc_find(rpc_client *cl, char *name) {
 
     // Otherwise search was successful. Return handle object.
     handle->handle_id = x;
-    printf("prc_find is fine?\n");              // temprint	todo
     return handle;
 }
 
-#define temp 3
+// todo - deal with inconsistencies of read write length? (-1 issue)
 
 rpc_data *rpc_call(rpc_client *cl, rpc_handle *h, rpc_data *payload) {
-    char handle_id[temp];
-    snprintf(handle_id, temp, "%d", h->handle_id);
+    char handle_id[MAX_HANDLE_ID_LENGTH];
+    snprintf(handle_id, MAX_HANDLE_ID_LENGTH, "%d", h->handle_id);
 
-    int n = write(cl->sockfd, handle_id, temp);
+    int n = write(cl->sockfd, handle_id, MAX_HANDLE_ID_LENGTH);
     if (n < 0) {
 		perror("write");
 		exit(EXIT_FAILURE);
 	}   
-    printf("Wrote function call for function [%s] to server\n", handle_id);
+    // printf("Wrote function call for function [%s] to server\n", handle_id);      // temprint
 
     rpc_send_data(cl->sockfd, payload);
-    printf("Sent data to server\n");
+    // printf("Sent data to server\n");      // temprint
     return rpc_receive_data(cl->sockfd);
 
 }
@@ -412,8 +421,8 @@ void rpc_send_data(int socket, rpc_data *payload) {
 
 
     // Log to terminal data to be sent (to observe changes)     -- temp/todo
-    printf("-- DATA TO BE SENT: --\n");
-    rpc_print_data(payload);
+    // printf("-- DATA TO BE SENT: --\n");      // temprint
+    // rpc_print_data(payload);      // temprint
 
 
     // Initiate buffers to store (and later write) converted rpc_data fields
@@ -451,7 +460,7 @@ void rpc_send_data(int socket, rpc_data *payload) {
         }
     }
 
-    printf("-- DATA HAS BEEN SENT --\n");
+    // printf("-- DATA HAS BEEN SENT --\n");      // temprint
 }
 
 rpc_data *rpc_receive_data(int socket) {
@@ -468,7 +477,7 @@ rpc_data *rpc_receive_data(int socket) {
 
 
     // Log to terminal reception begun (to observe changes)         -- todo / temp
-    printf("-- DATA RECEIVAL BEGUN --\n");
+    // printf("-- DATA RECEIVAL BEGUN --\n");      // temprint
 
 
     // Initiate buffers to read in rpc_data fields
@@ -520,8 +529,8 @@ rpc_data *rpc_receive_data(int socket) {
 
 
     // Log to terminal data to received (to observe changes)     -- temp/todo
-    printf("-- DATA HAS BEEN RECEIVED: --\n");
-    rpc_print_data(return_data);
+    // printf("-- DATA HAS BEEN RECEIVED: --\n");      // temprint
+    // rpc_print_data(return_data);      // temprint
 
 
     return return_data;
