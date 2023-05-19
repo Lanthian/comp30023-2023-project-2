@@ -32,3 +32,4 @@ format:
 
 clean:
 	rm -f *.o $(RPC_SERVER) $(RPC_CLIENT)
+	rm -f server client

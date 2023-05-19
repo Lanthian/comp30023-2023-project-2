@@ -1,5 +1,7 @@
 rpc-server
 rpc-client
+server
+client
 *.exe
 *.o
 *.BAK
