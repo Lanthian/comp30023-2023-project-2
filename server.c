@@ -3,18 +3,52 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+// Constants for reading in arguments
+#define FLAG_PORT 'p'
+#define NO_PORT -1
+#define PARAM_NEEDED 1
+
 rpc_data *add2_i8(rpc_data *);
 
+
 int main(int argc, char *argv[]) {
+    // -- Read in arguments to run client --
+    int port_num = NO_PORT;
+
+    // Start from 1 to skip executable argument
+    for (int i=1; i<argc; i++) {
+        // Look for '-x' where x is some known flag.
+        if ((argv[i][0] == '-') && (i+1 < argc)) {
+
+            // Check for missing flag value
+            if (argv[i+1][0] == '-') {
+                printf("ERROR: Missing flag value.\n");
+                return(EXIT_SUCCESS);
+            }
+
+            switch(argv[i][1]) {
+                // Also increment i to skip next term
+                case FLAG_PORT:
+                    port_num = atoi(argv[++i]);
+                    break;
+                default:
+                    printf("ERROR: Unknown flag entered.\n");
+                    return(EXIT_SUCCESS);
+            }
+        }
+    }
+
+    // Check enough parameters have been read in 
+    int param_read = 0;
+    if (port_num != NO_PORT) param_read++;
+
     // Check enough arguments have been read in to instantiate client.
-    if (argc < 2) {
-        printf("Not enough arguments. \n\tFormat: ./server port_num\n"); // todo properly
+    if (param_read < PARAM_NEEDED) {       // todo - declare constant here 
+        printf("Not enough arguments. (%d/%d)\n\tFormat: ./rpc-server -p port_num\n", param_read, PARAM_NEEDED);
         exit(EXIT_SUCCESS);
     } 
 
-    // Temporary declaration here, just for cohesion of code
-    int port_num = atoi(argv[1]);
-
+    // ======================== Actual server code from this point forth
 
     rpc_server *server = rpc_init_server(port_num);
     if (server == NULL) {

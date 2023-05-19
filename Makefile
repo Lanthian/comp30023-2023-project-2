@@ -17,10 +17,10 @@ client.o: client.c rpc.h
 	$(CC) -c -o $@ $<
 
 $(RPC_SERVER): server.o $(RPC_SYSTEM)
-	$(CC) -Wall -o $(RPC_SERVER) server.o $(RPC_SYSTEM)
+	$(CC) -o $(RPC_SERVER) server.o $(RPC_SYSTEM)
 
 $(RPC_CLIENT): client.o $(RPC_SYSTEM)
-	$(CC) -Wall -o $(RPC_CLIENT) client.o $(RPC_SYSTEM)
+	$(CC) -o $(RPC_CLIENT) client.o $(RPC_SYSTEM)
 
 # RPC_SYSTEM_A=rpc.a
 # $(RPC_SYSTEM_A): rpc.o
