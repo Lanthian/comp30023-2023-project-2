@@ -4,3 +4,21 @@ using rpc_send_flag and rpc_read_flag manage all writes and reads to that packet
 finish answers.txt
 
 fix malloc and frees throughout code - remembering to close all open files and sockets
+
+
+
+
+================================================================================
+
+
+frees
+---
+initial server
+    each handle added to server
+
+close client:
+    free client
+    close client socket
+
+every non NULL response of rpc_read_data
+    and every non NULL data2

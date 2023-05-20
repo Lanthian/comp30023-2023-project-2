@@ -8,12 +8,16 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <signal.h>
 
 #include <assert.h>
 
 
 // Task 9
 #define NONBLOCKING
+
+
+#define RPC_TIMEOUT 30
 #define ALPHA 0
 #define NUMA 0
 
@@ -48,8 +52,16 @@ int rpc_send_flag(int socket, int flag);
 int rpc_read_flag(int socket);
 int rpc_check_data(rpc_data *data);
 
+void rpc_close_server(rpc_server *srv);
+
 void rpc_print_data(rpc_data *data); // todo
 
+
+// Global variable to handle in alarm state. Careful with usage.
+rpc_server *global_srv = NULL;
+void alarm_handler() {
+    rpc_close_server(global_srv);
+}
 
 struct rpc_server {
     /* Variable(s) for server state */
@@ -122,6 +134,8 @@ rpc_server *rpc_init_server(int port) {
     // Quickly set new socket address so it's not an unassigned value
     server->newsockfd = NO_SOCKET;
 
+    // Set global server to server instance - note this means only 1 server can be run and closed properly at a time.
+    global_srv = server;
     // Given listen is successful, return server (not yet blocked)
 	return server;
 
@@ -146,7 +160,7 @@ int rpc_register(rpc_server *srv, char *name, rpc_handler handler) {
     // Check name length
     if (strlen(name) <= 0 || strlen(name) > MAX_FUNC_NAME_LENGTH) return -1;
 
-    // Find available handle spot in 
+    // Find available handle spot in server handles array
     int index = -1;
     for (int i = 0; i<MAX_HANDLES; i++) {
         if (srv->handles[i] == NULL) {
@@ -167,25 +181,55 @@ int rpc_register(rpc_server *srv, char *name, rpc_handler handler) {
     }
 
     // Allocate details to handle, returning handle index (ID)
-    srv->handles[index]->handle_id = index;                 // Done for client side
-    strcpy(srv->handles[index]->function_name, name);		// Not really needed but good to hold onto
+    srv->handles[index]->handle_id = index;                 // Done for client side access
+    strcpy(srv->handles[index]->function_name, name);		// Searched for with rpc_find
     srv->handles[index]->function = handler;                // Function pointer for server side
 
     return index;
 }
 
+/*
+  Closes an rpc_server* instance, freeing all functions, closing sockets and
+  finally freeing the server itself before exiting the program with
+  EXIT_SUCCESS.
+*/
+void rpc_close_server(rpc_server *srv) {
+    // Free function handles
+    for (int index=0; index<MAX_HANDLES; index++) {
+        if (srv->handles[index] != NULL) {
+            free(srv->handles[index]);
+            srv->handles[index] = NULL;
+        }
+    }
+    
+    // Close sockets
+    close(srv->sockfd);
+    if (srv->newsockfd != NO_SOCKET) close(srv->newsockfd);
+
+    // Free server itself, then exit
+    free(srv);
+    srv = NULL;
+    exit(EXIT_SUCCESS);     // todo - ideally would just end and not exit, letting serve_all return and numerous servers run. alas.
+}
 
 void rpc_serve_all(rpc_server *srv) {
 
     struct sockaddr_in client_addr;
     socklen_t client_addr_size;
 
+    // Define clean up function for server in case of accept timeout
+    signal(SIGALRM, alarm_handler);
+
     while(1) {
+        // Start timeout alarm
+        alarm(RPC_TIMEOUT);
+
         // Accept a client
         srv->client_addr_size = sizeof srv->client_addr;
         srv->newsockfd = accept(srv->sockfd, (struct sockaddr*)&srv->hints, 
                                 &(srv->client_addr_size));
         // todo - get client_addr into hints somehow.....
+
 
         if (srv->newsockfd < 0) {
             perror("accept");
@@ -205,6 +249,7 @@ void rpc_serve_all(rpc_server *srv) {
 
         // If Parent process - do nothing, looping again
         else if (c_pid > 0) {
+            close(srv->newsockfd);          // todo?
             srv->newsockfd = NO_SOCKET;      // maybe close first?
             srv->client_addr_size = sizeof srv->client_addr;        // not needed perhaps if client_addr fixed
             continue;
@@ -310,7 +355,6 @@ void rpc_serve_all(rpc_server *srv) {
 
                 // No flag sent
                 case(SERVER_FLAG_EMPTY):
-                    // printf("Done with server :)\n");     // temprint
                     // todo -free stuff?
                     close(srv->newsockfd);
                     return;
@@ -529,7 +573,6 @@ rpc_data *rpc_call(rpc_client *cl, rpc_handle *h, rpc_data *payload) {
 
 void rpc_close_client(rpc_client *cl) {
     if (cl == NULL) return;
-    // todo - check if socket already closed
     else {
         // Close and free client
         close(cl->sockfd);
@@ -649,7 +692,7 @@ rpc_data *rpc_read_data(int socket) {
     rpc_data *return_data = malloc(sizeof(rpc_data));
     if (return_data == NULL) {
         perror("malloc");
-        exit(EXIT_FAILURE);
+        goto cleanup;
     }
 
     // Initiate buffers to read in rpc_data fields
@@ -659,7 +702,7 @@ rpc_data *rpc_read_data(int socket) {
     int n = read(socket, int_buffer, MAX_INT_LENGTH-1);
 	if (n < 0) {
 		perror("read");
-		exit(EXIT_FAILURE);
+		goto cleanup;
 	}   
     int_buffer[n] = '\0';
     // Convert char* data1 to int and store
@@ -670,7 +713,7 @@ rpc_data *rpc_read_data(int socket) {
     n = read(socket, int_buffer, MAX_INT_LENGTH-1);
 	if (n < 0) {
 		perror("read");
-		exit(EXIT_FAILURE);
+		goto cleanup;
 	}   
     int_buffer[n] = '\0';
     // Convert char* data1 to size_t and store
@@ -686,7 +729,7 @@ rpc_data *rpc_read_data(int socket) {
         n = read(socket, data2_buffer, return_data->data2_len);
         if (n < 0) {
             perror("read");
-            exit(EXIT_FAILURE);
+            goto cleanup;
         }   
         data2_buffer[n] = '\0';
 
@@ -700,6 +743,10 @@ rpc_data *rpc_read_data(int socket) {
 
     // Return read data
     return return_data;
+
+cleanup:
+    if (return_data != NULL) free(return_data);
+    exit(EXIT_FAILURE);
 }
 
 int rpc_check_data(rpc_data *data) {
