@@ -291,13 +291,7 @@ void rpc_serve_all(rpc_server *srv) {
 
                     // todo - thread here? Or earlier... Dunno.
                     rpc_data *data = rpc_read_data(srv->newsockfd);
-                    // printf("data received\n");       // temprint
-                    printf("VV\n");
-                    rpc_print_data(data);
-                    rpc_print_data((srv->handles[handle_id]->function)(data));
-                    printf("--\n");
                     rpc_send_data(srv->newsockfd, (srv->handles[handle_id]->function)(data));
-                    printf("^^\n");
 
                     // Free data, as malloced in rpc_read_data
                     rpc_data_free(data);
@@ -487,10 +481,7 @@ rpc_data *rpc_call(rpc_client *cl, rpc_handle *h, rpc_data *payload) {
     // Check if data2 could be sent or not - return NULL if fail
     if (n<0) return NULL;
 
-    // printf("Sent data to server\n");      // temprint
-    printf("V/V\n");
     return rpc_read_data(cl->sockfd);
-    printf("^/^\n");
 }
 
 void rpc_close_client(rpc_client *cl) {
@@ -527,7 +518,6 @@ int return_sockfd(rpc_client *client) {
   Returns 0 on success, NO_RPC_DATA or DATA2_TOO_BIG on specific fail.
 */
 int rpc_send_data(int socket, rpc_data *payload) {
-    printf("write call\n");
     // Check data is not NULL 
     if (payload == NULL) {
         printf("Error: No data.\n");
@@ -544,14 +534,9 @@ int rpc_send_data(int socket, rpc_data *payload) {
     // Initiate buffers to store (and later write) converted rpc_data fields
     char int_buffer[MAX_INT_LENGTH];
 
+
     // Convert data1 (int) to char*
     snprintf(int_buffer, MAX_INT_LENGTH, "%d", payload->data1);
-    printf("!! %ld ", strlen(int_buffer));
-    // int_buffer[strlen(int_buffer)] = EOF;
-    printf(" %ld\n", strlen(int_buffer));
-    printf("d1: %ld\n", strlen(int_buffer));
-    printf("!!!!!! %d %ld\n", MAX_INT_LENGTH -1, strlen(int_buffer));
-
     // Fill remaining buffer garbage with temp garbage value
     /* Buffer has to be written as MAX_INT_LENGTH -1 instead of strlen(buffer)
     as inorder to ensure that the max possible int is read on the read side
@@ -569,7 +554,6 @@ int rpc_send_data(int socket, rpc_data *payload) {
 
     // Convert dat2_len (size_t) to char*
     snprintf(int_buffer, MAX_INT_LENGTH, "%d", (int)payload->data2_len);
-    printf("d2len: %ld\n", strlen(int_buffer));
     // Fill remaining buffer garbage with temp garbage value
     for (int i=strlen(int_buffer); i<MAX_INT_LENGTH; i++) {
         int_buffer[i] = GARBAGE_FILL;
@@ -595,35 +579,23 @@ int rpc_send_data(int socket, rpc_data *payload) {
     }
 
     // Packet successfully sent
-    printf("Not waiting?\n");
     return 0;
 }
 
-/*
-  Reads from a socket file descriptor 
-*/
+
 /*
   Reads data fields of rpc_data* from a socket file descriptor `socket`,
   converting fields from string format and mallocing a returned rpc_data 
-  pointer. Returns NULL on fail.
+  pointer. Returns NULL on fail. rpc_data* returned otherwise needs to be freed
+  later (malloc-d here).
 */
 rpc_data *rpc_read_data(int socket) {
-    printf("read call\n");
-    // read from a socket, translate data (via buffer and conversion, etc.) back to ideal data
-    // malloc an rpc_data (can be moved to where this is called instead I guess)
-    // remember to free this malloc later
-
     // Allocate returned data, checking if space to malloc
     rpc_data *return_data = malloc(sizeof(rpc_data));
     if (return_data == NULL) {
         perror("malloc");
         exit(EXIT_FAILURE);
     }
-
-
-    // Log to terminal reception begun (to observe changes)         -- todo / temp
-    // printf("-- DATA RECEIVAL BEGUN --\n");      // temprint
-
 
     // Initiate buffers to read in rpc_data fields
     char int_buffer[MAX_INT_LENGTH];
@@ -636,9 +608,7 @@ rpc_data *rpc_read_data(int socket) {
 	}   
     int_buffer[n] = '\0';
     // Convert char* data1 to int and store
-    printf("read1 s: %s\n", int_buffer);
     return_data->data1 = atoi(int_buffer);
-    printf("store1 s: %d\n", return_data->data1);
 
 
     // Read in data2_len
@@ -649,11 +619,8 @@ rpc_data *rpc_read_data(int socket) {
 	}   
     int_buffer[n] = '\0';
     // Convert char* data1 to size_t and store
-    printf("read2len s: %s\n", int_buffer);
     return_data->data2_len = (size_t) atoi(int_buffer);
-    printf("store1 s: %ld\n", return_data->data2_len);
 
-    printf("=========VVV\n");
     // Check if data2 needs to be read
     if (return_data->data2_len > 0) {
         // Malloc space for void* pointer
@@ -669,22 +636,14 @@ rpc_data *rpc_read_data(int socket) {
         data2_buffer[n] = '\0';
 
         // Copy/store read in data in/to return_data (of type void*)
-        printf("read2 s: %s\n", data2_buffer);
         memcpy(return_data->data2, data2_buffer, return_data->data2_len);
-        printf("store2 s\n");
     }
     else {
         // Otherwise, no data2 field, set NULL
         return_data->data2 = NULL;
     }
-    printf("=========^^^\n");
 
-
-    // Log to terminal data to received (to observe changes)     -- temp/todo
-    // printf("-- DATA HAS BEEN RECEIVED: --\n");      // temprint
-    // rpc_print_data(return_data);      // temprint
-
-
+    // Return read data
     return return_data;
 }
 
