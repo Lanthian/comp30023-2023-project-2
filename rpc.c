@@ -17,7 +17,7 @@
 #define NONBLOCKING
 
 
-#define RPC_TIMEOUT 30          // todo change back to 30
+#define RPC_TIMEOUT 7          // todo change back to 30
 #define NUMA 0
 
 
@@ -60,6 +60,8 @@ void rpc_print_data(rpc_data *data); // todo
 rpc_server *global_srv = NULL;
 void alarm_handler() {
     rpc_close_server(global_srv);
+    // return;          // todo
+    exit(EXIT_SUCCESS);     // todo - ideally would just end and not exit, letting serve_all return and numerous servers run. alas.
 }
 
 struct rpc_server {
@@ -143,6 +145,8 @@ cleanup:
     if (server != NULL) free(server);
     if (res != NULL) free(res);
 
+    if (global_srv != NULL) global_srv = NULL;
+
     return NULL;
 }
 
@@ -208,7 +212,6 @@ void rpc_close_server(rpc_server *srv) {
     // Free server itself, then exit
     free(srv);
     srv = NULL;
-    exit(EXIT_SUCCESS);     // todo - ideally would just end and not exit, letting serve_all return and numerous servers run. alas.
 }
 
 void rpc_serve_all(rpc_server *srv) {
@@ -227,7 +230,6 @@ void rpc_serve_all(rpc_server *srv) {
         srv->newsockfd = accept(srv->sockfd, (struct sockaddr*)&srv->hints, 
                                 &(srv->client_addr_size));
         // todo - get client_addr into hints somehow.....
-
 
         if (srv->newsockfd < 0) {
             perror("accept");
@@ -349,9 +351,9 @@ void rpc_serve_all(rpc_server *srv) {
 
                 // No flag sent
                 case(SERVER_FLAG_EMPTY):
-                    // todo -free stuff?
-                    close(srv->newsockfd);
-                    return;
+                    // Free threaded memory malloc-d
+                    rpc_close_server(srv);
+                    exit(EXIT_SUCCESS);
 
 
                 // Undeclared flag sent somehow

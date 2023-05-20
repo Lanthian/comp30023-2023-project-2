@@ -3,3 +3,5 @@ rpc-client
 *.exe
 *.o
 *.BAK
+
+*valgrind-out.txt
