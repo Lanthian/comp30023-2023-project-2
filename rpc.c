@@ -461,6 +461,15 @@ rpc_handle *rpc_find(rpc_client *cl, char *name) {
 // todo - deal with inconsistencies of read write length? (-1 issue)
 
 rpc_data *rpc_call(rpc_client *cl, rpc_handle *h, rpc_data *payload) {
+    // Make sure there is data forwarded via call
+    if (payload == NULL) return NULL;
+
+    // Check if protocol can send data2
+    if (payload->data2_len > PACKET_LIMIT) {
+        perror("Overlength error");
+        return NULL;
+    }
+
     // Convert handle_id to char* for sending
     char handle_id[MAX_HANDLE_ID_LENGTH];
     snprintf(handle_id, MAX_HANDLE_ID_LENGTH, "%d", h->handle_id);
