@@ -36,6 +36,7 @@
 #define SERVER_FLAG_EMPTY 0
 #define SERVER_FLAG_FIND 1
 #define SERVER_FLAG_CALL 2
+#define CLIENT_FLAG_HANDLE_FAIL -6
 
 int rpc_send_data(int socket, rpc_data *payload);
 rpc_data *rpc_read_data(int socket);
@@ -295,10 +296,8 @@ void rpc_serve_all(rpc_server *srv) {
 
                     n = rpc_send_data(srv->newsockfd, (srv->handles[handle_id]->function)(data));
                     if (n==NO_RPC_DATA) {
-                        // Applying the handle to the data destroyed it. Client will be left waiting.
-                        perror("Invalid handle call.\n");
-                        rpc_data_free(data);
-                        exit(EXIT_FAILURE);
+                        // Applying the handle to the data destroyed it. 
+                        rpc_send_flag(srv->newsockfd, CLIENT_FLAG_HANDLE_FAIL);
                     }
 
                     // Free data, as malloced in rpc_read_data
@@ -497,6 +496,10 @@ rpc_data *rpc_call(rpc_client *cl, rpc_handle *h, rpc_data *payload) {
     // Send data, double checking that send was successful
     n = rpc_send_data(cl->sockfd, payload);
     if (n<0) return NULL;
+
+    // Read flag to check if handle operation was successful
+    n = rpc_read_flag(cl->sockfd);
+    if (n==CLIENT_FLAG_HANDLE_FAIL) return NULL;
 
     return rpc_read_data(cl->sockfd);
 }
