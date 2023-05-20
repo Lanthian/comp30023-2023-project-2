@@ -12,15 +12,24 @@
 #include <assert.h>
 
 
+// Task 9
+#define NONBLOCKING
+
+
 #define MAX_FUNC_NAME_LENGTH 1000
 #define MAX_INT_LENGTH 11       // Includes space for a '\0' terminator
+#define GARBAGE_FILL '\0'
+#define PACKET_LIMIT 65535
 
 #define MAX_HANDLES 10
 #define MAX_HANDLE_ID_LENGTH 3          // should maybe be 2?
 
 #define BACK_LOG 10
 
+#define NO_HANDLE -2
 #define NO_SOCKET -3
+#define NO_RPC_DATA -4
+#define DATA2_TOO_BIG -5
 
 #define SERVER_FLAG_BUFFER 2            // todo - rename this to something less convoluted
 // 0 reserved, as read flag fails return 0          // todo alter comment
@@ -28,10 +37,12 @@
 #define SERVER_FLAG_FIND 1
 #define SERVER_FLAG_CALL 2
 
-void rpc_send_data(int socket, rpc_data *payload);
+int rpc_send_data(int socket, rpc_data *payload);
 rpc_data *rpc_read_data(int socket);
 int rpc_send_flag(int socket, int flag);
 int rpc_read_flag(int socket);
+
+void rpc_print_data(rpc_data *data); // todo
 
 struct rpc_server {
     /* Variable(s) for server state */
@@ -213,7 +224,7 @@ void rpc_serve_all(rpc_server *srv) {
 
 
         port = ntohs(srv->client_addr.sin_port);
-        printf("New connection from %s:%d on socket %d\n", ip, port, srv->newsockfd);        // temprint
+        // printf("New connection from %s:%d on socket %d\n", ip, port, srv->newsockfd);        // temprint
         
         while(1) {
             // Read command flag
@@ -234,11 +245,9 @@ void rpc_serve_all(rpc_server *srv) {
                     }
                     func_name[n] = '\0';    // null terminate read data
 
-                    // printf("compare name w/ existing function name\n");
-                    // printf("Searched for handle: %s\n", func_name);         // temprint
 
                     // Check if handle exists
-                    int handle_index = -1;
+                    int handle_index = NO_HANDLE;
                     for (int i=0; i<MAX_HANDLES; i++) {
 
                         // Firstly check if _a_ handle exists at index
@@ -251,17 +260,13 @@ void rpc_serve_all(rpc_server *srv) {
                             }
                         }
                     }
-                    if (handle_index == -1) {
-                        // Function of searched name doesn't exist
-                        // printf("Function %s not found.\n", func_name);       // temprint
-                        return;
-                    }
+                    // If handle_index == NO_HANDLE, function of searched name doesn't exist. Write back -1.
+
 
                     // Write message back
                     char id[MAX_HANDLE_ID_LENGTH];
                     snprintf(id, MAX_HANDLE_ID_LENGTH, "%d", handle_index);
 
-                    // printf("Function %s requested. (successful)\n", func_name);      // temprint
                     n = write(srv->newsockfd, id, MAX_HANDLE_ID_LENGTH-1);            // todo change max int length to 3??? or 4????
                     if (n < 0) {
                         perror("write");
@@ -281,22 +286,18 @@ void rpc_serve_all(rpc_server *srv) {
                     }
                     func_handle_id[n] = '\0';   // null terminate read data
 
-                    // Check if no function call sent (and in turn server end for client reached)
-                    if (n == 0) {
-                        printf("End of server reached. - don't want to ever see this again\n");    // todo remove  
-                        // todo - clean server thread up
-                        close(srv->newsockfd);
-                        break;
-                    }
-
-                    // printf("function request for id [%s] received.\n", func_handle_id);      // temprint
                     int handle_id = atoi(func_handle_id);
-                    assert(handle_id != -1);            // todo?
+                    assert(handle_id != NO_HANDLE);     // technically not needed but doesn't hurt.
 
                     // todo - thread here? Or earlier... Dunno.
                     rpc_data *data = rpc_read_data(srv->newsockfd);
                     // printf("data received\n");       // temprint
+                    printf("VV\n");
+                    rpc_print_data(data);
+                    rpc_print_data((srv->handles[handle_id]->function)(data));
+                    printf("--\n");
                     rpc_send_data(srv->newsockfd, (srv->handles[handle_id]->function)(data));
+                    printf("^^\n");
 
                     // Free data, as malloced in rpc_read_data
                     rpc_data_free(data);
@@ -386,7 +387,7 @@ int rpc_send_flag(int socket, int flag) {
     char flag_buffer[SERVER_FLAG_BUFFER];
     snprintf(flag_buffer, SERVER_FLAG_BUFFER, "%d", flag);
 
-    int n = write(socket, flag_buffer, SERVER_FLAG_BUFFER-1);
+    int n = write(socket, flag_buffer, strlen(flag_buffer));           // todo -SERVER_FLAG_BUFFER-1
     if (n < 0) {
         perror("write");
         exit(EXIT_FAILURE);
@@ -424,7 +425,7 @@ rpc_handle *rpc_find(rpc_client *cl, char *name) {
     }
 
     // Fill temporary values for handle
-    handle->handle_id = -1;
+    handle->handle_id = NO_HANDLE;
     handle->function = NULL;				// Client doesn't need access to server side function pointer
     // handle->function_name = name;        // -- todo fix issue here
 
@@ -452,7 +453,7 @@ rpc_handle *rpc_find(rpc_client *cl, char *name) {
     
     // Transform string ID to int ID
     int x = atoi(buffer);
-    if (x < 0) {
+    if (x == NO_HANDLE) {
         // Function not found on server
         free(handle);
         return NULL;
@@ -482,10 +483,14 @@ rpc_data *rpc_call(rpc_client *cl, rpc_handle *h, rpc_data *payload) {
 	}   
     // printf("Wrote function call for function [%s] to server\n", handle_id);      // temprint
 
-    rpc_send_data(cl->sockfd, payload);
-    // printf("Sent data to server\n");      // temprint
-    return rpc_read_data(cl->sockfd);
+    n = rpc_send_data(cl->sockfd, payload);
+    // Check if data2 could be sent or not - return NULL if fail
+    if (n<0) return NULL;
 
+    // printf("Sent data to server\n");      // temprint
+    printf("V/V\n");
+    return rpc_read_data(cl->sockfd);
+    printf("^/^\n");
 }
 
 void rpc_close_client(rpc_client *cl) {
@@ -516,39 +521,61 @@ int return_sockfd(rpc_client *client) {
 }
 
 
-void rpc_send_data(int socket, rpc_data *payload) {
-    // write to a socket, translate data (via buffer and conversion) to string / byte format first.
-    // different errors for each stage that can fail.
-    
+/*
+  Writes data fields of rpc_data* `payload` to socket file descriptor `socket`,
+  converting fields to string format first to deal with endianness.  
+  Returns 0 on success, NO_RPC_DATA or DATA2_TOO_BIG on specific fail.
+*/
+int rpc_send_data(int socket, rpc_data *payload) {
+    printf("write call\n");
     // Check data is not NULL 
     if (payload == NULL) {
         printf("Error: No data.\n");
-        exit(EXIT_FAILURE);
+        return NO_RPC_DATA;
+    }
+
+    // Check if protocol can send data2
+    if (payload->data2_len > PACKET_LIMIT) {
+        printf("Error: Data2 too large to send as a packet.\n");
+        return DATA2_TOO_BIG;
     }
 
 
-    // Log to terminal data to be sent (to observe changes)     -- temp/todo
-    // printf("-- DATA TO BE SENT: --\n");      // temprint
-    // rpc_print_data(payload);      // temprint
-
-
     // Initiate buffers to store (and later write) converted rpc_data fields
-    char data1_buffer[MAX_INT_LENGTH];
-    char data2_len_buffer[MAX_INT_LENGTH];
+    char int_buffer[MAX_INT_LENGTH];
 
-    // Convert data1 (int) and data2_len (size_t) to char*
-    snprintf(data1_buffer, MAX_INT_LENGTH, "%d", payload->data1);
-    snprintf(data2_len_buffer, MAX_INT_LENGTH, "%d", (int)payload->data2_len);
+    // Convert data1 (int) to char*
+    snprintf(int_buffer, MAX_INT_LENGTH, "%d", payload->data1);
+    printf("!! %ld ", strlen(int_buffer));
+    // int_buffer[strlen(int_buffer)] = EOF;
+    printf(" %ld\n", strlen(int_buffer));
+    printf("d1: %ld\n", strlen(int_buffer));
+    printf("!!!!!! %d %ld\n", MAX_INT_LENGTH -1, strlen(int_buffer));
 
+    // Fill remaining buffer garbage with temp garbage value
+    /* Buffer has to be written as MAX_INT_LENGTH -1 instead of strlen(buffer)
+    as inorder to ensure that the max possible int is read on the read side
+    each time, MAX_INT_LENGTH-1 must be read.*/
+    for (int i=strlen(int_buffer); i<MAX_INT_LENGTH; i++) {
+        int_buffer[i] = GARBAGE_FILL;
+    }
     // Write data1
-    int n = write(socket, data1_buffer, MAX_INT_LENGTH-1);
+    int n = write(socket, int_buffer, MAX_INT_LENGTH-1);
     if (n < 0) {
         perror("write");
         exit(EXIT_FAILURE);
     }
 
+
+    // Convert dat2_len (size_t) to char*
+    snprintf(int_buffer, MAX_INT_LENGTH, "%d", (int)payload->data2_len);
+    printf("d2len: %ld\n", strlen(int_buffer));
+    // Fill remaining buffer garbage with temp garbage value
+    for (int i=strlen(int_buffer); i<MAX_INT_LENGTH; i++) {
+        int_buffer[i] = GARBAGE_FILL;
+    }
     // Write data2_len
-    n = write(socket, data2_len_buffer, MAX_INT_LENGTH-1);
+    n = write(socket, int_buffer, MAX_INT_LENGTH-1);        //MAX_INT_LENGTH-1
     if (n < 0) {
         perror("write");
         exit(EXIT_FAILURE);
@@ -567,10 +594,21 @@ void rpc_send_data(int socket, rpc_data *payload) {
         }
     }
 
-    // printf("-- DATA HAS BEEN SENT --\n");      // temprint
+    // Packet successfully sent
+    printf("Not waiting?\n");
+    return 0;
 }
 
+/*
+  Reads from a socket file descriptor 
+*/
+/*
+  Reads data fields of rpc_data* from a socket file descriptor `socket`,
+  converting fields from string format and mallocing a returned rpc_data 
+  pointer. Returns NULL on fail.
+*/
 rpc_data *rpc_read_data(int socket) {
+    printf("read call\n");
     // read from a socket, translate data (via buffer and conversion, etc.) back to ideal data
     // malloc an rpc_data (can be moved to where this is called instead I guess)
     // remember to free this malloc later
@@ -588,30 +626,34 @@ rpc_data *rpc_read_data(int socket) {
 
 
     // Initiate buffers to read in rpc_data fields
-    char data1_buffer[MAX_INT_LENGTH];
-    char data2_len_buffer[MAX_INT_LENGTH];
+    char int_buffer[MAX_INT_LENGTH];
 
     // Read in data1
-    int n = read(socket, data1_buffer, MAX_INT_LENGTH-1);
+    int n = read(socket, int_buffer, MAX_INT_LENGTH-1);
 	if (n < 0) {
 		perror("read");
 		exit(EXIT_FAILURE);
 	}   
-    data1_buffer[n] = '\0';
+    int_buffer[n] = '\0';
+    // Convert char* data1 to int and store
+    printf("read1 s: %s\n", int_buffer);
+    return_data->data1 = atoi(int_buffer);
+    printf("store1 s: %d\n", return_data->data1);
+
 
     // Read in data2_len
-    n = read(socket, data2_len_buffer, MAX_INT_LENGTH-1);
+    n = read(socket, int_buffer, MAX_INT_LENGTH-1);
 	if (n < 0) {
 		perror("read");
 		exit(EXIT_FAILURE);
 	}   
-    data2_len_buffer[n] = '\0';
+    int_buffer[n] = '\0';
+    // Convert char* data1 to size_t and store
+    printf("read2len s: %s\n", int_buffer);
+    return_data->data2_len = (size_t) atoi(int_buffer);
+    printf("store1 s: %ld\n", return_data->data2_len);
 
-    // Convert and store read in char* to data1 (int) and data2_len (size_t)
-    return_data->data1 = atoi(data1_buffer);
-    return_data->data2_len = (size_t) atoi(data2_len_buffer);
-
-
+    printf("=========VVV\n");
     // Check if data2 needs to be read
     if (return_data->data2_len > 0) {
         // Malloc space for void* pointer
@@ -627,12 +669,15 @@ rpc_data *rpc_read_data(int socket) {
         data2_buffer[n] = '\0';
 
         // Copy/store read in data in/to return_data (of type void*)
+        printf("read2 s: %s\n", data2_buffer);
         memcpy(return_data->data2, data2_buffer, return_data->data2_len);
+        printf("store2 s\n");
     }
     else {
         // Otherwise, no data2 field, set NULL
         return_data->data2 = NULL;
     }
+    printf("=========^^^\n");
 
 
     // Log to terminal data to received (to observe changes)     -- temp/todo
@@ -657,7 +702,14 @@ void rpc_print_data(rpc_data *data) {
     printf("__________________________________\n");
     printf("data1: %d\n", data->data1);
     printf("data2_len: %d\n", (int)data->data2_len);
-    if (data->data2_len > 0) printf("data2: %s\n", (unsigned char*)data->data2);
+    if (data->data2_len > 0) {
+        printf("data2: ");
+        for (int i=0; i<(int)data->data2_len; i++) {
+            printf("%c", ((unsigned char*)data->data2)[i]);
+        }
+        printf("\n");
+    }
+    //printf("data2: %s\n", (unsigned char*)data->data2);
     printf("``````````````````````````````````\n");
 }
 

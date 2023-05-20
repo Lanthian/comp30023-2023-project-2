@@ -81,7 +81,7 @@ int main(int argc, char *argv[]) {
     // printf("3 (using handle_add2 = %p)\n", handle_add2);         // temprint
     // return -1;
 
-    for (int i = 0; i < 2; i++) {
+    for (int i = 0; i < 4; i++) {
         /* Prepare request */
         char left_operand = i;             // i
         char right_operand = 100;           // 100
