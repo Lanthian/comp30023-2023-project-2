@@ -291,7 +291,15 @@ void rpc_serve_all(rpc_server *srv) {
 
                     // todo - thread here? Or earlier... Dunno.
                     rpc_data *data = rpc_read_data(srv->newsockfd);
-                    rpc_send_data(srv->newsockfd, (srv->handles[handle_id]->function)(data));
+                    assert(data != NULL);
+
+                    n = rpc_send_data(srv->newsockfd, (srv->handles[handle_id]->function)(data));
+                    if (n==NO_RPC_DATA) {
+                        // Applying the handle to the data destroyed it. Client will be left waiting.
+                        perror("Invalid handle call.\n");
+                        rpc_data_free(data);
+                        exit(EXIT_FAILURE);
+                    }
 
                     // Free data, as malloced in rpc_read_data
                     rpc_data_free(data);
@@ -461,8 +469,9 @@ rpc_handle *rpc_find(rpc_client *cl, char *name) {
 // todo - deal with inconsistencies of read write length? (-1 issue)
 
 rpc_data *rpc_call(rpc_client *cl, rpc_handle *h, rpc_data *payload) {
-    // Make sure there is data forwarded via call
+    // Make sure data and handle exist
     if (payload == NULL) return NULL;
+    if (h == NULL) return NULL;
 
     // Check if protocol can send data2
     if (payload->data2_len > PACKET_LIMIT) {
@@ -484,10 +493,9 @@ rpc_data *rpc_call(rpc_client *cl, rpc_handle *h, rpc_data *payload) {
 		perror("write");
 		exit(EXIT_FAILURE);
 	}   
-    // printf("Wrote function call for function [%s] to server\n", handle_id);      // temprint
 
+    // Send data, double checking that send was successful
     n = rpc_send_data(cl->sockfd, payload);
-    // Check if data2 could be sent or not - return NULL if fail
     if (n<0) return NULL;
 
     return rpc_read_data(cl->sockfd);
@@ -528,10 +536,7 @@ int return_sockfd(rpc_client *client) {
 */
 int rpc_send_data(int socket, rpc_data *payload) {
     // Check data is not NULL 
-    if (payload == NULL) {
-        printf("Error: No data.\n");
-        return NO_RPC_DATA;
-    }
+    if (payload == NULL) return NO_RPC_DATA;
 
     // Check if protocol can send data2
     if (payload->data2_len > PACKET_LIMIT) {
