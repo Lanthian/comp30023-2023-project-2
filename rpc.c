@@ -17,7 +17,7 @@
 #define NONBLOCKING
 
 
-#define RPC_TIMEOUT 7          // todo change back to 30
+#define RPC_TIMEOUT 60         // todo change back to 30
 #define NUMA 0
 
 
@@ -163,12 +163,22 @@ int rpc_register(rpc_server *srv, char *name, rpc_handler handler) {
     // Check name length
     if (strlen(name) <= 0 || strlen(name) > MAX_FUNC_NAME_LENGTH) return -1;
 
+    // First look for existent handle to replace
+    // for (int i = 0; i<MAX_HANDLES; i++)
+
     // Find available handle spot in server handles array
     int index = -1;
     for (int i = 0; i<MAX_HANDLES; i++) {
-        if (srv->handles[i] == NULL) {
+        // Search for duplicate name registered (overwrite)
+        if (srv->handles[i] != NULL && strcmp(name, srv->handles[i]->function_name)==0) {
+            free(srv->handles[i]);
             index = i;
             break;
+        }
+
+        // Otherwise locate first unused handle spot
+        else if (srv->handles[i] == NULL && index == -1) {
+            index = i;
         }
     }
 
@@ -220,6 +230,7 @@ void rpc_serve_all(rpc_server *srv) {
 
     // Define clean up function for server in case of accept timeout
     signal(SIGALRM, alarm_handler);
+    signal(SIGINT, alarm_handler);
 
     while(1) {
         // Start timeout alarm
