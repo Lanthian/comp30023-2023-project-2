@@ -18,7 +18,6 @@
 
 
 #define RPC_TIMEOUT 60         // todo change back to 30
-#define NUMA 0
 
 
 #define MAX_FUNC_NAME_LENGTH 1000
@@ -225,9 +224,6 @@ void rpc_close_server(rpc_server *srv) {
 }
 
 void rpc_serve_all(rpc_server *srv) {
-    struct sockaddr_in client_addr;
-    socklen_t client_addr_size;
-
     // Define clean up function for server in case of accept timeout
     signal(SIGALRM, alarm_handler);
     signal(SIGINT, alarm_handler);
@@ -268,21 +264,20 @@ void rpc_serve_all(rpc_server *srv) {
         // Otherwise, Child process - serve client
 
 
-        char ip[INET6_ADDRSTRLEN];
-        int port;
-
-        getpeername(srv->newsockfd, (struct sockaddr*)&client_addr, 
-                                &(srv->client_addr_size));
-        // getpeername(srv->newsockfd, (struct sockaddr*) &(srv->client_addr), 
+        // -- Printing connection details -- (commented out)
+        // struct sockaddr_in client_addr;
+        // char ip[INET6_ADDRSTRLEN];
+        // int port;
+        // getpeername(srv->newsockfd, (struct sockaddr*)&client_addr, 
         //                         &(srv->client_addr_size));
+        // // getpeername(srv->newsockfd, (struct sockaddr*) &(srv->client_addr), 
+        // //                         &(srv->client_addr_size));
+        // inet_ntop(client_addr.sin_family, &client_addr.sin_addr, ip, INET6_ADDRSTRLEN);
+        // // inet_ntop(srv->client_addr.sin_family, &(srv->client_addr.sin_addr), ip, INET6_ADDRSTRLEN);
+        // port = ntohs(srv->client_addr.sin_port);
+        // printf("New connection from %s:%d on socket %d\n", ip, port, srv->newsockfd);
 
-        inet_ntop(client_addr.sin_family, &client_addr.sin_addr, ip, INET6_ADDRSTRLEN);
-        // inet_ntop(srv->client_addr.sin_family, &(srv->client_addr.sin_addr), ip, INET6_ADDRSTRLEN);
 
-
-        port = ntohs(srv->client_addr.sin_port);
-        // printf("New connection from %s:%d on socket %d\n", ip, port, srv->newsockfd);        // temprint
-        
         while(1) {
             // Read command flag
             int flag = rpc_read_flag(srv->newsockfd);
@@ -372,11 +367,10 @@ void rpc_serve_all(rpc_server *srv) {
                     perror("unknown server_flag");
                     exit(EXIT_FAILURE);
             }
-            // printf("Looping\n");     // temprint
         }
     }
-    // todo - cleanup (maybe a few frees too?)
-    // close(srv->sockfd);
+    // Code should never reach here
+    assert(0);
 }
 
 struct rpc_client {
@@ -510,8 +504,6 @@ rpc_handle *rpc_find(rpc_client *cl, char *name) {
     }
     // Null-terminate string
     buffer[n] = '\0';
-
-    if (NUMA) printf("2\n");
     
     // Transform string ID to int ID
     int x = atoi(buffer);
@@ -530,7 +522,6 @@ cleanup:
     exit(EXIT_FAILURE);
 }
 
-// todo - deal with inconsistencies of read write length? (-1 issue)
 
 rpc_data *rpc_call(rpc_client *cl, rpc_handle *h, rpc_data *payload) {
     // Make sure data and handle exist
@@ -548,10 +539,8 @@ rpc_data *rpc_call(rpc_client *cl, rpc_handle *h, rpc_data *payload) {
     char handle_id[MAX_HANDLE_ID_LENGTH];
     snprintf(handle_id, MAX_HANDLE_ID_LENGTH, "%d", h->handle_id);
 
-    if (NUMA) printf("3\n");
     // Send flag to server to let it know rpc_call has been called
     rpc_send_flag(cl->sockfd, SERVER_FLAG_CALL);
-    if (NUMA) printf("4\n");
 
     // Write handle id to server before sending data
     int n = write(cl->sockfd, handle_id, MAX_HANDLE_ID_LENGTH-1);
@@ -559,7 +548,6 @@ rpc_data *rpc_call(rpc_client *cl, rpc_handle *h, rpc_data *payload) {
 		perror("write");
 		exit(EXIT_FAILURE);
 	}   
-    if (NUMA) printf("5\n");
 
     // Send data, double checking that send was successful
     n = rpc_send_data(cl->sockfd, payload);
