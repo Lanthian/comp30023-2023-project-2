@@ -22,3 +22,4 @@ close client:
 
 every non NULL response of rpc_read_data
     and every non NULL data2
+    (in turn data returned from rpc_call) <--- not on us!

@@ -1,4 +1,5 @@
 CC=gcc
+FLAGS=-Wall -g -ggdb3
 RPC_SYSTEM=rpc.o
 RPC_SERVER=rpc-server
 RPC_CLIENT=rpc-client
@@ -17,10 +18,10 @@ client.o: client.c rpc.h
 	$(CC) -c -o $@ $<
 
 $(RPC_SERVER): server.o $(RPC_SYSTEM)
-	$(CC) -o $(RPC_SERVER) server.o $(RPC_SYSTEM)
+	$(CC) -o $(RPC_SERVER) $(FLAGS) server.o $(RPC_SYSTEM)
 
 $(RPC_CLIENT): client.o $(RPC_SYSTEM)
-	$(CC) -o $(RPC_CLIENT) client.o $(RPC_SYSTEM)
+	$(CC) -o $(RPC_CLIENT) $(FLAGS) client.o $(RPC_SYSTEM)
 
 # RPC_SYSTEM_A=rpc.a
 # $(RPC_SYSTEM_A): rpc.o

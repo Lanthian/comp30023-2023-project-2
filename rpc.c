@@ -17,8 +17,7 @@
 #define NONBLOCKING
 
 
-#define RPC_TIMEOUT 30
-#define ALPHA 0
+#define RPC_TIMEOUT 30          // todo change back to 30
 #define NUMA 0
 
 
@@ -213,7 +212,6 @@ void rpc_close_server(rpc_server *srv) {
 }
 
 void rpc_serve_all(rpc_server *srv) {
-
     struct sockaddr_in client_addr;
     socklen_t client_addr_size;
 
@@ -274,12 +272,9 @@ void rpc_serve_all(rpc_server *srv) {
         
         while(1) {
             // Read command flag
-            if (ALPHA) printf("d\n");
             int flag = rpc_read_flag(srv->newsockfd);
             int n;
 
-            // printf("flag: %d\n", flag);      // temprint
-            if (ALPHA) printf("e\n");
             switch(flag){
                 // rpc_find:
                 case SERVER_FLAG_FIND:
@@ -326,7 +321,7 @@ void rpc_serve_all(rpc_server *srv) {
                 case SERVER_FLAG_CALL:
                     // Read in function handle_id (index in handles array)
                     char func_handle_id[MAX_HANDLE_ID_LENGTH];        // can take 0-99 handles
-                    n = read(srv->newsockfd, func_handle_id, MAX_HANDLE_ID_LENGTH);    // n is the number of characters read      // todo fix this 3
+                    n = read(srv->newsockfd, func_handle_id, MAX_HANDLE_ID_LENGTH-1);    // n is the number of characters read      // todo fix this 3
                     if (n < 0) {
                         perror("read");
                         exit(EXIT_FAILURE);
@@ -340,16 +335,15 @@ void rpc_serve_all(rpc_server *srv) {
                     // Abort if rpc_call failed to send data for some reason.
                     if (data==NULL) break;
 
-                    if (ALPHA) printf("a\n");
+                    rpc_data* new_data = (srv->handles[handle_id]->function)(data);
+                    rpc_send_data(srv->newsockfd, new_data);
 
-                    rpc_send_data(srv->newsockfd, (srv->handles[handle_id]->function)(data));
-                    // todo - FIXER
-
-                    if (ALPHA) printf("c\n");
-
-                    // Free data, as malloced in rpc_read_data
+                    // Free data, as malloced in rpc_read_data and handle
                     rpc_data_free(data);
                     data = NULL;
+                    rpc_data_free(new_data);
+                    data = NULL;
+
                     break;
 
 
@@ -457,21 +451,14 @@ int rpc_read_flag(int socket) {
     // Initiate buffers to read in rpc_data fields
     char flag_buffer[SERVER_FLAG_BUFFER];
 
-    if (ALPHA) printf("f\n");
-
     // Read in flag
     int n = read(socket, flag_buffer, SERVER_FLAG_BUFFER-1);
 	if (n < 0) {
-        // todo
-        if (ALPHA) printf("g.0\n");
-		// perror("read");          // todo
-        if (ALPHA) printf("g\n");
+		// perror("read");       
         return SERVER_FLAG_EMPTY;
-		exit(EXIT_FAILURE);
+		// exit(EXIT_FAILURE);
 	}   
     flag_buffer[n] = '\0';
-
-    if (ALPHA) printf("h\n");
 
     // Convert and return flag
     return atoi(flag_buffer);
@@ -482,7 +469,7 @@ rpc_handle *rpc_find(rpc_client *cl, char *name) {
     rpc_handle *handle = malloc(sizeof(rpc_handle));
     if (handle == NULL) {
         perror("lack of memory");
-        exit(EXIT_FAILURE);
+        goto cleanup;
     }
 
     // Fill temporary values for handle
@@ -498,17 +485,15 @@ rpc_handle *rpc_find(rpc_client *cl, char *name) {
     int n = write(cl->sockfd, name, strlen(name));
     if (n < 0) {
         perror("socket");
-        exit(EXIT_FAILURE);
+        goto cleanup;
     }
-
-    if (NUMA) printf("1\n");
 
     // Read handle ID to construct handle from server
     char buffer[MAX_INT_LENGTH];
     n = read(cl->sockfd, buffer, MAX_INT_LENGTH-1);
     if (n < 0) {
         perror("read");
-        exit(EXIT_FAILURE);
+        goto cleanup;
     }
     // Null-terminate string
     buffer[n] = '\0';
@@ -526,6 +511,10 @@ rpc_handle *rpc_find(rpc_client *cl, char *name) {
     // Otherwise search was successful. Return handle object.
     handle->handle_id = x;
     return handle;
+
+cleanup:
+    if (handle!=NULL) free(handle);
+    exit(EXIT_FAILURE);
 }
 
 // todo - deal with inconsistencies of read write length? (-1 issue)
@@ -552,7 +541,7 @@ rpc_data *rpc_call(rpc_client *cl, rpc_handle *h, rpc_data *payload) {
     if (NUMA) printf("4\n");
 
     // Write handle id to server before sending data
-    int n = write(cl->sockfd, handle_id, MAX_HANDLE_ID_LENGTH);
+    int n = write(cl->sockfd, handle_id, MAX_HANDLE_ID_LENGTH-1);
     if (n < 0) {
 		perror("write");
 		exit(EXIT_FAILURE);
@@ -563,12 +552,7 @@ rpc_data *rpc_call(rpc_client *cl, rpc_handle *h, rpc_data *payload) {
     n = rpc_send_data(cl->sockfd, payload);
     if (n<0) return NULL;
 
-    // printf(">.. %d ..\n", n);        // temprint
-    if (NUMA) printf("7\n");
-    rpc_data* l = rpc_read_data(cl->sockfd);
-
-    // rpc_print_data(l);
-    return l;
+    return rpc_read_data(cl->sockfd);;
 }
 
 void rpc_close_client(rpc_client *cl) {
