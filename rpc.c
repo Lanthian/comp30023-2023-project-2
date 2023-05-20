@@ -41,12 +41,15 @@
 #define SEND_FLAG_HANDLE_FAIL -5
 #define SEND_FLAG_DATA2_TOO_BIG -6
 
+// Function headers
 int rpc_send_data(int socket, rpc_data *payload);
 rpc_data *rpc_read_data(int socket);
 int rpc_send_flag(int socket, int flag);
 int rpc_read_flag(int socket);
+int rpc_check_data(rpc_data *data);
 
 void rpc_print_data(rpc_data *data); // todo
+
 
 struct rpc_server {
     /* Variable(s) for server state */
@@ -294,13 +297,9 @@ void rpc_serve_all(rpc_server *srv) {
                     int handle_id = atoi(func_handle_id);
                     assert(handle_id != NO_HANDLE);     // technically not needed but doesn't hurt.
 
-                    // todo - thread here? Or earlier... Dunno.
                     rpc_data *data = rpc_read_data(srv->newsockfd);
-                    if (data==NULL) {
-                        // rpc_call failed to send data for some reason. Abort.
-                        // rpc_send_flag(srv->newsockfd, -1);       // todo
-                        break;
-                    }
+                    // Abort if rpc_call failed to send data for some reason.
+                    if (data==NULL) break;
 
                     if (ALPHA) printf("a\n");
 
@@ -495,8 +494,9 @@ rpc_handle *rpc_find(rpc_client *cl, char *name) {
 
 rpc_data *rpc_call(rpc_client *cl, rpc_handle *h, rpc_data *payload) {
     // Make sure data and handle exist
-    if (payload == NULL) return NULL;
+    if (rpc_check_data(payload)<0) return NULL;
     if (h == NULL) return NULL;
+    
 
     // Check if protocol can send data2
     if (payload->data2_len > PACKET_LIMIT) {
@@ -566,6 +566,7 @@ int return_sockfd(rpc_client *client) {
   converting fields to string format first to deal with endianness. First sends 
   a single digit flag to let symmetric rpc_read_data know if followed through
   or aborted.
+  Returns an int indicator send success, or if fail, the specific error flag.
 */
 int rpc_send_data(int socket, rpc_data *payload) {
     // Check data is not NULL 
@@ -705,6 +706,15 @@ rpc_data *rpc_read_data(int socket) {
 
     // Return read data
     return return_data;
+}
+
+int rpc_check_data(rpc_data *data) {
+    if (data == NULL) return -1;
+    if (data->data2_len < 0) return -1;
+    else if (data->data2_len == 0 && data->data2 != NULL) return -1;
+    else if (data->data2_len != 0 && data->data2 == NULL) return -1;
+    // printf("..%ld %ld\n", data->data2_len, strlen(data->data2));     // not checkable right now...
+    return 0;
 }
 
 // rpc_handle *get_server_handle(rpc_server *srv) {
