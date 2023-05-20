@@ -77,6 +77,13 @@ int main(int argc, char *argv[]) {
         exit_code = 1;
         goto cleanup;
     }
+    // todo - temp
+    handle_add2 = rpc_find(client, "add2");
+    if (handle_add2 == NULL) {
+        fprintf(stderr, "ERROR: Function add2 does not exist\n");
+        exit_code = 1;
+        goto cleanup;
+    }
 
     // printf("3 (using handle_add2 = %p)\n", handle_add2);         // temprint
     // return -1;

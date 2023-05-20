@@ -1,0 +1,6 @@
+using rpc_send_flag and rpc_read_flag manage all writes and reads to that packets
+    cannot be lost :))
+
+finish answers.txt
+
+fix malloc and frees throughout code - remembering to close all open files and sockets

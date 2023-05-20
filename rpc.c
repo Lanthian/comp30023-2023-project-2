@@ -14,6 +14,8 @@
 
 // Task 9
 #define NONBLOCKING
+#define ALPHA 0
+#define NUMA 0
 
 
 #define MAX_FUNC_NAME_LENGTH 1000
@@ -29,14 +31,15 @@
 #define NO_HANDLE -2
 #define NO_SOCKET -3
 #define NO_RPC_DATA -4
-#define DATA2_TOO_BIG -5
 
 #define SERVER_FLAG_BUFFER 2            // todo - rename this to something less convoluted
 // 0 reserved, as read flag fails return 0          // todo alter comment
 #define SERVER_FLAG_EMPTY 0
 #define SERVER_FLAG_FIND 1
 #define SERVER_FLAG_CALL 2
-#define CLIENT_FLAG_HANDLE_FAIL -6
+#define SEND_FLAG_HANDLE_SUCCESS 3
+#define SEND_FLAG_HANDLE_FAIL -5
+#define SEND_FLAG_DATA2_TOO_BIG -6
 
 int rpc_send_data(int socket, rpc_data *payload);
 rpc_data *rpc_read_data(int socket);
@@ -229,11 +232,12 @@ void rpc_serve_all(rpc_server *srv) {
         
         while(1) {
             // Read command flag
+            if (ALPHA) printf("d\n");
             int flag = rpc_read_flag(srv->newsockfd);
             int n;
 
             // printf("flag: %d\n", flag);      // temprint
-            
+            if (ALPHA) printf("e\n");
             switch(flag){
                 // rpc_find:
                 case SERVER_FLAG_FIND:
@@ -292,13 +296,18 @@ void rpc_serve_all(rpc_server *srv) {
 
                     // todo - thread here? Or earlier... Dunno.
                     rpc_data *data = rpc_read_data(srv->newsockfd);
-                    assert(data != NULL);
-
-                    n = rpc_send_data(srv->newsockfd, (srv->handles[handle_id]->function)(data));
-                    if (n==NO_RPC_DATA) {
-                        // Applying the handle to the data destroyed it. 
-                        rpc_send_flag(srv->newsockfd, CLIENT_FLAG_HANDLE_FAIL);
+                    if (data==NULL) {
+                        // rpc_call failed to send data for some reason. Abort.
+                        // rpc_send_flag(srv->newsockfd, -1);       // todo
+                        break;
                     }
+
+                    if (ALPHA) printf("a\n");
+
+                    rpc_send_data(srv->newsockfd, (srv->handles[handle_id]->function)(data));
+                    // todo - FIXER
+
+                    if (ALPHA) printf("c\n");
 
                     // Free data, as malloced in rpc_read_data
                     rpc_data_free(data);
@@ -309,6 +318,7 @@ void rpc_serve_all(rpc_server *srv) {
                 // No flag sent
                 case(SERVER_FLAG_EMPTY):
                     // printf("Done with server :)\n");     // temprint
+                    // todo -free stuff?
                     close(srv->newsockfd);
                     return;
 
@@ -388,7 +398,12 @@ int rpc_send_flag(int socket, int flag) {
     char flag_buffer[SERVER_FLAG_BUFFER];
     snprintf(flag_buffer, SERVER_FLAG_BUFFER, "%d", flag);
 
-    int n = write(socket, flag_buffer, strlen(flag_buffer));           // todo -SERVER_FLAG_BUFFER-1
+    // Fill garbage of write before sending
+    for (int i=strlen(flag_buffer); i<SERVER_FLAG_BUFFER; i++) {
+        flag_buffer[i] = GARBAGE_FILL;
+    }
+
+    int n = write(socket, flag_buffer, SERVER_FLAG_BUFFER-1);           // todo -SERVER_FLAG_BUFFER-1
     if (n < 0) {
         perror("write");
         exit(EXIT_FAILURE);
@@ -405,13 +420,21 @@ int rpc_read_flag(int socket) {
     // Initiate buffers to read in rpc_data fields
     char flag_buffer[SERVER_FLAG_BUFFER];
 
+    if (ALPHA) printf("f\n");
+
     // Read in flag
     int n = read(socket, flag_buffer, SERVER_FLAG_BUFFER-1);
 	if (n < 0) {
-		perror("read");
+        // todo
+        if (ALPHA) printf("g.0\n");
+		// perror("read");          // todo
+        if (ALPHA) printf("g\n");
+        return SERVER_FLAG_EMPTY;
 		exit(EXIT_FAILURE);
 	}   
     flag_buffer[n] = '\0';
+
+    if (ALPHA) printf("h\n");
 
     // Convert and return flag
     return atoi(flag_buffer);
@@ -441,6 +464,7 @@ rpc_handle *rpc_find(rpc_client *cl, char *name) {
         exit(EXIT_FAILURE);
     }
 
+    if (NUMA) printf("1\n");
 
     // Read handle ID to construct handle from server
     char buffer[MAX_INT_LENGTH];
@@ -451,6 +475,8 @@ rpc_handle *rpc_find(rpc_client *cl, char *name) {
     }
     // Null-terminate string
     buffer[n] = '\0';
+
+    if (NUMA) printf("2\n");
     
     // Transform string ID to int ID
     int x = atoi(buffer);
@@ -482,9 +508,10 @@ rpc_data *rpc_call(rpc_client *cl, rpc_handle *h, rpc_data *payload) {
     char handle_id[MAX_HANDLE_ID_LENGTH];
     snprintf(handle_id, MAX_HANDLE_ID_LENGTH, "%d", h->handle_id);
 
+    if (NUMA) printf("3\n");
     // Send flag to server to let it know rpc_call has been called
     rpc_send_flag(cl->sockfd, SERVER_FLAG_CALL);
-
+    if (NUMA) printf("4\n");
 
     // Write handle id to server before sending data
     int n = write(cl->sockfd, handle_id, MAX_HANDLE_ID_LENGTH);
@@ -492,16 +519,18 @@ rpc_data *rpc_call(rpc_client *cl, rpc_handle *h, rpc_data *payload) {
 		perror("write");
 		exit(EXIT_FAILURE);
 	}   
+    if (NUMA) printf("5\n");
 
     // Send data, double checking that send was successful
     n = rpc_send_data(cl->sockfd, payload);
     if (n<0) return NULL;
 
-    // Read flag to check if handle operation was successful
-    n = rpc_read_flag(cl->sockfd);
-    if (n==CLIENT_FLAG_HANDLE_FAIL) return NULL;
+    // printf(">.. %d ..\n", n);        // temprint
+    if (NUMA) printf("7\n");
+    rpc_data* l = rpc_read_data(cl->sockfd);
 
-    return rpc_read_data(cl->sockfd);
+    // rpc_print_data(l);
+    return l;
 }
 
 void rpc_close_client(rpc_client *cl) {
@@ -534,18 +563,28 @@ int return_sockfd(rpc_client *client) {
 
 /*
   Writes data fields of rpc_data* `payload` to socket file descriptor `socket`,
-  converting fields to string format first to deal with endianness.  
-  Returns 0 on success, NO_RPC_DATA or DATA2_TOO_BIG on specific fail.
+  converting fields to string format first to deal with endianness. First sends 
+  a single digit flag to let symmetric rpc_read_data know if followed through
+  or aborted.
 */
 int rpc_send_data(int socket, rpc_data *payload) {
     // Check data is not NULL 
-    if (payload == NULL) return NO_RPC_DATA;
+    if (payload == NULL) {
+        /* Data is null, either due to code mismanagement, or a failed handle 
+        being applied to it. Send a flag to let reading socket know to abort. */
+        rpc_send_flag(socket, SEND_FLAG_HANDLE_FAIL);
+        return SEND_FLAG_HANDLE_FAIL;
+    } 
 
     // Check if protocol can send data2
-    if (payload->data2_len > PACKET_LIMIT) {
+    else if (payload->data2_len > PACKET_LIMIT) {
         printf("Error: Data2 too large to send as a packet.\n");
-        return DATA2_TOO_BIG;
+        rpc_send_flag(socket, SEND_FLAG_DATA2_TOO_BIG);
+        return SEND_FLAG_DATA2_TOO_BIG;
     }
+
+    // Otherwise, send an affirmation flag to give reading socket the go ahead
+    rpc_send_flag(socket, SEND_FLAG_HANDLE_SUCCESS);
 
 
     // Initiate buffers to store (and later write) converted rpc_data fields
@@ -607,6 +646,10 @@ int rpc_send_data(int socket, rpc_data *payload) {
   later (malloc-d here).
 */
 rpc_data *rpc_read_data(int socket) {
+    // Read flag from socket - abort if send fail
+    int flag = rpc_read_flag(socket);
+    if (flag<0) return NULL;
+
     // Allocate returned data, checking if space to malloc
     rpc_data *return_data = malloc(sizeof(rpc_data));
     if (return_data == NULL) {
