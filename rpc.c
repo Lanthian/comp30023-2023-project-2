@@ -174,10 +174,8 @@ int rpc_register(rpc_server *srv, char *name, rpc_handler handler) {
     return index;
 }
 
+
 void rpc_serve_all(rpc_server *srv) {
-    // printf("((((((((((((((((((((((((()))))))))))))))))))))))))\n");      // temprint
-    // printf("---Serving!---\n");      // temprint
-    // rpc_print_handle(srv->handle);
 
     struct sockaddr_in client_addr;
     socklen_t client_addr_size;
@@ -212,10 +210,6 @@ void rpc_serve_all(rpc_server *srv) {
             continue;
         }
         // Otherwise, Child process - serve client
-    
-
-        // printf("CONNECTION ESTABLISHED!!!\n");           // temprint
-        // todo - threading here
 
 
         char ip[INET6_ADDRSTRLEN];
@@ -258,7 +252,7 @@ void rpc_serve_all(rpc_server *srv) {
                     int handle_index = NO_HANDLE;
                     for (int i=0; i<MAX_HANDLES; i++) {
 
-                        // Firstly check if _a_ handle exists at index
+                        // Firstly check if a handle exists at index
                         if (srv->handles[i] != NULL) {
                             // Then check if it matches the name queried. 
                             if (strcmp(srv->handles[i]->function_name, func_name) == 0) {
@@ -570,8 +564,8 @@ int return_sockfd(rpc_client *client) {
 */
 int rpc_send_data(int socket, rpc_data *payload) {
     // Check data is not NULL 
-    if (payload == NULL) {
-        /* Data is null, either due to code mismanagement, or a failed handle 
+    if (rpc_check_data(payload)) {
+        /* Data is bad, either due to code mismanagement, or a failed handle 
         being applied to it. Send a flag to let reading socket know to abort. */
         rpc_send_flag(socket, SEND_FLAG_HANDLE_FAIL);
         return SEND_FLAG_HANDLE_FAIL;
