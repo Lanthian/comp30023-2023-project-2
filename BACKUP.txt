@@ -95,3 +95,18 @@ client.c (main):
 	// buffer[n] = '\0';
 	// printf("%s\n", buffer);
     // // ........................................................................
+
+
+rpc.c (rpc_serve_all):
+    // -- Printing connection details -- (commented out)
+    // struct sockaddr_in client_addr;
+    // char ip[INET6_ADDRSTRLEN];
+    // int port;
+    // getpeername(srv->newsockfd, (struct sockaddr*)&client_addr, 
+    //                         &(srv->client_addr_size));
+    // // getpeername(srv->newsockfd, (struct sockaddr*) &(srv->client_addr), 
+    // //                         &(srv->client_addr_size));
+    // inet_ntop(client_addr.sin_family, &client_addr.sin_addr, ip, INET6_ADDRSTRLEN);
+    // // inet_ntop(srv->client_addr.sin_family, &(srv->client_addr.sin_addr), ip, INET6_ADDRSTRLEN);
+    // port = ntohs(srv->client_addr.sin_port);
+    // printf("New connection from %s:%d on socket %d\n", ip, port, srv->newsockfd);

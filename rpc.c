@@ -13,37 +13,34 @@
 #include <assert.h>
 
 
-// Task 9
-#define NONBLOCKING
 
 
-#define RPC_TIMEOUT 60         // todo change back to 30
+// === Hash defines ===
+#define NONBLOCKING                 // (Task 9)
+#define RPC_TIMEOUT 60
+#define BACK_LOG 10
 
-
-#define MAX_FUNC_NAME_LENGTH 1000
-#define MAX_INT_LENGTH 11       // Includes space for a '\0' terminator
+#define MAX_NAME_LENGTH 1000
+#define MAX_INT_LENGTH 11           // Includes space for a '\0' terminator
 #define GARBAGE_FILL '\0'
 #define PACKET_LIMIT 65535
 
 #define MAX_HANDLES 10
-#define MAX_HANDLE_ID_LENGTH 3          // should maybe be 2?
-
-#define BACK_LOG 10
+#define MAX_HANDLE_ID_LENGTH 3      // Allows handles in range [-9,99]
 
 #define NO_HANDLE -2
 #define NO_SOCKET -3
-#define NO_RPC_DATA -4
 
-#define FLAG_BUFFER_SIZE 3            //
-// 0 reserved, as read flag fails return 0
-#define SERVER_FLAG_EMPTY 0
+#define FLAG_BUFFER_SIZE 3          // Allows flags in range [-9,99]
+#define SERVER_FLAG_EMPTY 0         // 0 reserved, as read flag fails return 0
 #define SERVER_FLAG_FIND 1
 #define SERVER_FLAG_CALL 2
 #define SEND_FLAG_SUCCESS 3
 #define SEND_FLAG_HANDLE_FAIL -5
 #define SEND_FLAG_DATA2_TOO_BIG -6
 
-// Function headers
+
+// Function header definitions
 int rpc_send_data(int socket, rpc_data *payload);
 rpc_data *rpc_read_data(int socket);
 int rpc_send_flag(int socket, int flag);
@@ -52,7 +49,8 @@ int rpc_check_data(rpc_data *data);
 
 void rpc_close_server(rpc_server *srv);
 
-void rpc_print_data(rpc_data *data); // todo
+void rpc_print_handle(rpc_handle *handle);
+void rpc_print_data(rpc_data *data);
 
 
 // Global variable to handle in alarm state. Careful with usage.
@@ -152,7 +150,7 @@ cleanup:
 struct rpc_handle {
     /* Add variable(s) for handle */
     int handle_id;
-    char function_name[MAX_FUNC_NAME_LENGTH];
+    char function_name[MAX_NAME_LENGTH];
     rpc_handler function;
 };
 
@@ -160,7 +158,7 @@ int rpc_register(rpc_server *srv, char *name, rpc_handler handler) {
     // Check f or null values
     if (srv == NULL || name == NULL || handler == NULL) return -1;
     // Check name length
-    if (strlen(name) <= 0 || strlen(name) > MAX_FUNC_NAME_LENGTH) return -1;
+    if (strlen(name) <= 0 || strlen(name) > MAX_NAME_LENGTH) return -1;
 
     // First look for existent handle to replace
     // for (int i = 0; i<MAX_HANDLES; i++)
@@ -223,6 +221,7 @@ void rpc_close_server(rpc_server *srv) {
     srv = NULL;
 }
 
+
 void rpc_serve_all(rpc_server *srv) {
     // Define clean up function for server in case of accept timeout
     signal(SIGALRM, alarm_handler);
@@ -240,7 +239,7 @@ void rpc_serve_all(rpc_server *srv) {
 
         if (srv->newsockfd < 0) {
             perror("accept");
-            exit(EXIT_FAILURE);
+            goto cleanup;
         }
 
 
@@ -250,34 +249,20 @@ void rpc_serve_all(rpc_server *srv) {
         // Check for fork error
         if (c_pid < 0) {
             perror("fork");
-            // todo - free server.... (closing file descriptors maybe...)
-            exit(EXIT_FAILURE);
+            goto cleanup;
         }
 
         // If Parent process - do nothing, looping again
         else if (c_pid > 0) {
-            close(srv->newsockfd);          // todo?
-            srv->newsockfd = NO_SOCKET;      // maybe close first?
+            close(srv->newsockfd);          
+            srv->newsockfd = NO_SOCKET;
             srv->client_addr_size = sizeof srv->client_addr;        // not needed perhaps if client_addr fixed
             continue;
         }
         // Otherwise, Child process - serve client
 
 
-        // -- Printing connection details -- (commented out)
-        // struct sockaddr_in client_addr;
-        // char ip[INET6_ADDRSTRLEN];
-        // int port;
-        // getpeername(srv->newsockfd, (struct sockaddr*)&client_addr, 
-        //                         &(srv->client_addr_size));
-        // // getpeername(srv->newsockfd, (struct sockaddr*) &(srv->client_addr), 
-        // //                         &(srv->client_addr_size));
-        // inet_ntop(client_addr.sin_family, &client_addr.sin_addr, ip, INET6_ADDRSTRLEN);
-        // // inet_ntop(srv->client_addr.sin_family, &(srv->client_addr.sin_addr), ip, INET6_ADDRSTRLEN);
-        // port = ntohs(srv->client_addr.sin_port);
-        // printf("New connection from %s:%d on socket %d\n", ip, port, srv->newsockfd);
-
-
+        // Begin serving client until connection ended.
         while(1) {
             // Read command flag
             int flag = rpc_read_flag(srv->newsockfd);
@@ -287,11 +272,11 @@ void rpc_serve_all(rpc_server *srv) {
                 // rpc_find:
                 case SERVER_FLAG_FIND:
                     // Read in function handle name (to be searched for)
-                    char func_name[MAX_FUNC_NAME_LENGTH];
-                    n = read(srv->newsockfd, func_name, MAX_FUNC_NAME_LENGTH-1);    // n is the number of characters read
+                    char func_name[MAX_NAME_LENGTH];
+                    n = read(srv->newsockfd, func_name, MAX_NAME_LENGTH-1);    // n is the number of characters read
                     if (n < 0) {
                         perror("read");
-                        exit(EXIT_FAILURE);
+                        goto cleanup;
                     }
                     func_name[n] = '\0';    // null terminate read data
 
@@ -320,7 +305,7 @@ void rpc_serve_all(rpc_server *srv) {
                     n = write(srv->newsockfd, id, MAX_HANDLE_ID_LENGTH-1);            // todo change max int length to 3??? or 4????
                     if (n < 0) {
                         perror("write");
-                        exit(EXIT_FAILURE);
+                        goto cleanup;
                     }   
                     break;
 
@@ -332,7 +317,7 @@ void rpc_serve_all(rpc_server *srv) {
                     n = read(srv->newsockfd, func_handle_id, MAX_HANDLE_ID_LENGTH-1);    // n is the number of characters read      // todo fix this 3
                     if (n < 0) {
                         perror("read");
-                        exit(EXIT_FAILURE);
+                        goto cleanup;
                     }
                     func_handle_id[n] = '\0';   // null terminate read data
 
@@ -365,12 +350,17 @@ void rpc_serve_all(rpc_server *srv) {
                 // Undeclared flag sent somehow
                 default:
                     perror("unknown server_flag");
-                    exit(EXIT_FAILURE);
+                    goto cleanup;
             }
         }
     }
     // Code should never reach here
     assert(0);
+
+cleanup:
+    // Significant error occured - wrap up code and abort executable
+    rpc_close_server(srv);
+    exit(EXIT_FAILURE);
 }
 
 struct rpc_client {
@@ -577,12 +567,6 @@ void rpc_data_free(rpc_data *data) {
 }
 
 
-// temp 2023.05.11
-int return_sockfd(rpc_client *client) {
-    return client->sockfd;
-}
-
-
 /*
   Writes data fields of rpc_data* `payload` to socket file descriptor `socket`,
   converting fields to string format first to deal with endianness. First sends 
@@ -616,7 +600,7 @@ int rpc_send_data(int socket, rpc_data *payload) {
 
     // Convert data1 (int) to char*
     snprintf(int_buffer, MAX_INT_LENGTH, "%d", payload->data1);
-    // Fill remaining buffer garbage with temp garbage value
+    // Fill remaining buffer garbage with replacement garbage value
     /* Buffer has to be written as MAX_INT_LENGTH -1 instead of strlen(buffer)
     as inorder to ensure that the max possible int is read on the read side
     each time, MAX_INT_LENGTH-1 must be read.*/
@@ -633,7 +617,7 @@ int rpc_send_data(int socket, rpc_data *payload) {
 
     // Convert dat2_len (size_t) to char*
     snprintf(int_buffer, MAX_INT_LENGTH, "%d", (int)payload->data2_len);
-    // Fill remaining buffer garbage with temp garbage value
+    // Fill remaining buffer garbage with replacement garbage value
     for (int i=strlen(int_buffer); i<MAX_INT_LENGTH; i++) {
         int_buffer[i] = GARBAGE_FILL;
     }
@@ -745,9 +729,6 @@ int rpc_check_data(rpc_data *data) {
     return 0;
 }
 
-// rpc_handle *get_server_handle(rpc_server *srv) {
-//     return (srv->handle);
-// }
 
 void rpc_print_handle(rpc_handle *handle) {
     printf("handle_id: %d\n", handle->handle_id);
@@ -769,14 +750,3 @@ void rpc_print_data(rpc_data *data) {
     //printf("data2: %s\n", (unsigned char*)data->data2);
     printf("``````````````````````````````````\n");
 }
-
-// // Print rpc_data before and after an operation of srv->handle.
-// void test_func_handle(rpc_server *srv, rpc_data *data) {
-//     // Print initial data
-//     rpc_print_data(data);
-//     // Print operation details
-//     rpc_handle *func = get_server_handle(srv);
-//     rpc_print_handle(func);
-//     // Print operated on data
-//     rpc_print_data((func->function)(data));
-// }
