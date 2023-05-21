@@ -34,12 +34,12 @@
 #define NO_SOCKET -3
 #define NO_RPC_DATA -4
 
-#define SERVER_FLAG_BUFFER 2            // todo - rename this to something less convoluted
-// 0 reserved, as read flag fails return 0          // todo alter comment
+#define FLAG_BUFFER_SIZE 3            //
+// 0 reserved, as read flag fails return 0
 #define SERVER_FLAG_EMPTY 0
 #define SERVER_FLAG_FIND 1
 #define SERVER_FLAG_CALL 2
-#define SEND_FLAG_HANDLE_SUCCESS 3
+#define SEND_FLAG_SUCCESS 3
 #define SEND_FLAG_HANDLE_FAIL -5
 #define SEND_FLAG_DATA2_TOO_BIG -6
 
@@ -429,19 +429,19 @@ rpc_client *rpc_init_client(char *addr, int port) {
 
 /* 
   Shorthand function to send (int) flags to a socket adress. Returns the number
-  of bytes sent (should be < SERVER_FLAG_BUFFER, > 0)
+  of bytes sent (should be < FLAG_BUFFER_SIZE, > 0)
 */
 int rpc_send_flag(int socket, int flag) {
     // Convert data1 (int) and data2_len (size_t) to char*
-    char flag_buffer[SERVER_FLAG_BUFFER];
-    snprintf(flag_buffer, SERVER_FLAG_BUFFER, "%d", flag);
+    char flag_buffer[FLAG_BUFFER_SIZE];
+    snprintf(flag_buffer, FLAG_BUFFER_SIZE, "%d", flag);
 
     // Fill garbage of write before sending
-    for (int i=strlen(flag_buffer); i<SERVER_FLAG_BUFFER; i++) {
+    for (int i=strlen(flag_buffer); i<FLAG_BUFFER_SIZE; i++) {
         flag_buffer[i] = GARBAGE_FILL;
     }
 
-    int n = write(socket, flag_buffer, SERVER_FLAG_BUFFER-1);           // todo -SERVER_FLAG_BUFFER-1
+    int n = write(socket, flag_buffer, FLAG_BUFFER_SIZE-1);           // todo =FLAG_BUFFER_SIZE-1  ?
     if (n < 0) {
         perror("write");
         exit(EXIT_FAILURE);
@@ -456,10 +456,10 @@ int rpc_send_flag(int socket, int flag) {
 */
 int rpc_read_flag(int socket) {
     // Initiate buffers to read in rpc_data fields
-    char flag_buffer[SERVER_FLAG_BUFFER];
+    char flag_buffer[FLAG_BUFFER_SIZE];
 
     // Read in flag
-    int n = read(socket, flag_buffer, SERVER_FLAG_BUFFER-1);
+    int n = read(socket, flag_buffer, FLAG_BUFFER_SIZE-1);
 	if (n < 0) {
 		// perror("read");       
         return SERVER_FLAG_EMPTY;
@@ -607,7 +607,7 @@ int rpc_send_data(int socket, rpc_data *payload) {
     }
 
     // Otherwise, send an affirmation flag to give reading socket the go ahead
-    rpc_send_flag(socket, SEND_FLAG_HANDLE_SUCCESS);
+    rpc_send_flag(socket, SEND_FLAG_SUCCESS);
 
 
     // Initiate buffers to store (and later write) converted rpc_data fields
@@ -671,7 +671,9 @@ int rpc_send_data(int socket, rpc_data *payload) {
 rpc_data *rpc_read_data(int socket) {
     // Read flag from socket - abort if send fail
     int flag = rpc_read_flag(socket);
-    if (flag<0) return NULL;
+    if (flag<0) {
+        return NULL;
+    }
 
     // Allocate returned data, checking if space to malloc
     rpc_data *return_data = malloc(sizeof(rpc_data));
