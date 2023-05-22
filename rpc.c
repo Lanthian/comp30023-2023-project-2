@@ -14,7 +14,6 @@
 
 
 
-
 // === Hash defines ===
 #define NONBLOCKING                 // (Task 9)
 #define RPC_TIMEOUT 60
@@ -40,6 +39,7 @@
 #define SEND_FLAG_DATA2_TOO_BIG -6
 
 
+
 // Function header definitions
 int rpc_send_data(int socket, rpc_data *payload);
 rpc_data *rpc_read_data(int socket);
@@ -53,13 +53,24 @@ void rpc_print_handle(rpc_handle *handle);
 void rpc_print_data(rpc_data *data);
 
 
+
 // Global variable to handle in alarm state. Careful with usage.
 rpc_server *global_srv = NULL;
-void alarm_handler() {
+
+/*
+  Closes the global rpc_server* instance `global_srv` and then exits the program
+  with an EXIT_SUCCESS. Should be triggered by a signal occurence while running.
+*/
+void end_program_handler() {
     rpc_close_server(global_srv);
-    // return;          // todo
-    exit(EXIT_SUCCESS);     // todo - ideally would just end and not exit, letting serve_all return and numerous servers run. alas.
+    exit(EXIT_SUCCESS);     
+    /* Future modification: handle singals such that server terminates and just
+       returns out of wherever called instead of full on closing. */
 }
+
+
+
+// Structures
 
 struct rpc_server {
     /* Variable(s) for server state */
@@ -73,6 +84,22 @@ struct rpc_server {
     // everything below here needs to be freed at some point
     rpc_handle* handles[MAX_HANDLES];
 };
+
+struct rpc_client {
+    /* Variable(s) for client state */
+    int sockfd;
+    struct addrinfo hints;
+};
+
+struct rpc_handle {
+    /* Add variable(s) for handle */
+    int handle_id;
+    char function_name[MAX_NAME_LENGTH];
+    rpc_handler function;
+};
+
+
+// ===== Server functions =====
 
 rpc_server *rpc_init_server(int port) {
     char port_str[6];
@@ -124,7 +151,7 @@ rpc_server *rpc_init_server(int port) {
 
 
     // -- Successfully initiated server socket, set to listen --
-    if (listen(server->sockfd, BACK_LOG) < 0) {    // todo - find out what this number means
+    if (listen(server->sockfd, BACK_LOG) < 0) {
         perror("listen");
         goto cleanup;
     }
@@ -132,7 +159,8 @@ rpc_server *rpc_init_server(int port) {
     // Quickly set new socket address so it's not an unassigned value
     server->newsockfd = NO_SOCKET;
 
-    // Set global server to server instance - note this means only 1 server can be run and closed properly at a time.
+    /* Set global server to server instance - note this means only 1 server can 
+       be run and closed properly at a time. */
     global_srv = server;
     // Given listen is successful, return server (not yet blocked)
 	return server;
@@ -147,21 +175,11 @@ cleanup:
     return NULL;
 }
 
-struct rpc_handle {
-    /* Add variable(s) for handle */
-    int handle_id;
-    char function_name[MAX_NAME_LENGTH];
-    rpc_handler function;
-};
-
 int rpc_register(rpc_server *srv, char *name, rpc_handler handler) {
-    // Check f or null values
+    // Check for null values
     if (srv == NULL || name == NULL || handler == NULL) return -1;
     // Check name length
     if (strlen(name) <= 0 || strlen(name) > MAX_NAME_LENGTH) return -1;
-
-    // First look for existent handle to replace
-    // for (int i = 0; i<MAX_HANDLES; i++)
 
     // Find available handle spot in server handles array
     int index = -1;
@@ -182,7 +200,7 @@ int rpc_register(rpc_server *srv, char *name, rpc_handler handler) {
     // Abort registration and parse back error if unsucessful
     if (index == -1) return -1;
 
-    // Malloc and assign handle to server           // -- todo, change this to array
+    // Malloc and assign handle to server
     srv->handles[index] = malloc(sizeof(rpc_handle));
     if (srv->handles[index] == NULL) {
         // no room in memory for malloc
@@ -191,41 +209,17 @@ int rpc_register(rpc_server *srv, char *name, rpc_handler handler) {
     }
 
     // Allocate details to handle, returning handle index (ID)
-    srv->handles[index]->handle_id = index;                 // Done for client side access
-    strcpy(srv->handles[index]->function_name, name);		// Searched for with rpc_find
-    srv->handles[index]->function = handler;                // Function pointer for server side
+    srv->handles[index]->handle_id = index;             // Done for client side access
+    strcpy(srv->handles[index]->function_name, name);	// Searched for with rpc_find
+    srv->handles[index]->function = handler;            // Function pointer for server side's use
 
     return index;
 }
 
-/*
-  Closes an rpc_server* instance, freeing all functions, closing sockets and
-  finally freeing the server itself before exiting the program with
-  EXIT_SUCCESS.
-*/
-void rpc_close_server(rpc_server *srv) {
-    // Free function handles
-    for (int index=0; index<MAX_HANDLES; index++) {
-        if (srv->handles[index] != NULL) {
-            free(srv->handles[index]);
-            srv->handles[index] = NULL;
-        }
-    }
-    
-    // Close sockets
-    close(srv->sockfd);
-    if (srv->newsockfd != NO_SOCKET) close(srv->newsockfd);
-
-    // Free server itself, then exit
-    free(srv);
-    srv = NULL;
-}
-
-
 void rpc_serve_all(rpc_server *srv) {
     // Define clean up function for server in case of accept timeout
-    signal(SIGALRM, alarm_handler);
-    signal(SIGINT, alarm_handler);
+    signal(SIGALRM, end_program_handler);
+    signal(SIGINT, end_program_handler);
 
     while(1) {
         // Start timeout alarm
@@ -235,7 +229,6 @@ void rpc_serve_all(rpc_server *srv) {
         srv->client_addr_size = sizeof srv->client_addr;
         srv->newsockfd = accept(srv->sockfd, (struct sockaddr*)&srv->hints, 
                                 &(srv->client_addr_size));
-        // todo - get client_addr into hints somehow.....
 
         if (srv->newsockfd < 0) {
             perror("accept");
@@ -256,7 +249,6 @@ void rpc_serve_all(rpc_server *srv) {
         else if (c_pid > 0) {
             close(srv->newsockfd);          
             srv->newsockfd = NO_SOCKET;
-            srv->client_addr_size = sizeof srv->client_addr;        // not needed perhaps if client_addr fixed
             continue;
         }
         // Otherwise, Child process - serve client
@@ -266,14 +258,15 @@ void rpc_serve_all(rpc_server *srv) {
         while(1) {
             // Read command flag
             int flag = rpc_read_flag(srv->newsockfd);
-            int n;
+            int n;      // n is a general int used for storing function returns
 
             switch(flag){
                 // rpc_find:
                 case SERVER_FLAG_FIND:
                     // Read in function handle name (to be searched for)
                     char func_name[MAX_NAME_LENGTH];
-                    n = read(srv->newsockfd, func_name, MAX_NAME_LENGTH-1);    // n is the number of characters read
+
+                    n = read(srv->newsockfd, func_name, MAX_NAME_LENGTH-1);    
                     if (n < 0) {
                         perror("read");
                         goto cleanup;
@@ -302,7 +295,7 @@ void rpc_serve_all(rpc_server *srv) {
                     char id[MAX_HANDLE_ID_LENGTH];
                     snprintf(id, MAX_HANDLE_ID_LENGTH, "%d", handle_index);
 
-                    n = write(srv->newsockfd, id, MAX_HANDLE_ID_LENGTH-1);            // todo change max int length to 3??? or 4????
+                    n = write(srv->newsockfd, id, MAX_HANDLE_ID_LENGTH-1);
                     if (n < 0) {
                         perror("write");
                         goto cleanup;
@@ -314,7 +307,7 @@ void rpc_serve_all(rpc_server *srv) {
                 case SERVER_FLAG_CALL:
                     // Read in function handle_id (index in handles array)
                     char func_handle_id[MAX_HANDLE_ID_LENGTH];        // can take 0-99 handles
-                    n = read(srv->newsockfd, func_handle_id, MAX_HANDLE_ID_LENGTH-1);    // n is the number of characters read      // todo fix this 3
+                    n = read(srv->newsockfd, func_handle_id, MAX_HANDLE_ID_LENGTH-1);
                     if (n < 0) {
                         perror("read");
                         goto cleanup;
@@ -340,7 +333,7 @@ void rpc_serve_all(rpc_server *srv) {
                     break;
 
 
-                // No flag sent
+                // No flag sent, or empty flag sent - terminate successfully
                 case(SERVER_FLAG_EMPTY):
                     // Free threaded memory malloc-d
                     rpc_close_server(srv);
@@ -363,11 +356,31 @@ cleanup:
     exit(EXIT_FAILURE);
 }
 
-struct rpc_client {
-    /* Variable(s) for client state */
-    int sockfd;
-    struct addrinfo hints;
-};
+/*
+  Closes an rpc_server* instance, freeing all functions, closing sockets and
+  finally freeing the server itself. Typically followed by an exit() call of 
+  some kind.
+*/
+void rpc_close_server(rpc_server *srv) {
+    // Free function handles
+    for (int index=0; index<MAX_HANDLES; index++) {
+        if (srv->handles[index] != NULL) {
+            free(srv->handles[index]);
+            srv->handles[index] = NULL;
+        }
+    }
+    
+    // Close sockets
+    close(srv->sockfd);
+    if (srv->newsockfd != NO_SOCKET) close(srv->newsockfd);
+
+    // Free server itself, then exit
+    free(srv);
+    srv = NULL;
+}
+
+
+// ===== Client functions =====
 
 rpc_client *rpc_init_client(char *addr, int port) {
     rpc_client *client = malloc(sizeof(rpc_client));
@@ -417,50 +430,6 @@ rpc_client *rpc_init_client(char *addr, int port) {
     return client;
 }
 
-/* 
-  Shorthand function to send (int) flags to a socket adress. Returns the number
-  of bytes sent (should be < FLAG_BUFFER_SIZE, > 0)
-*/
-int rpc_send_flag(int socket, int flag) {
-    // Convert data1 (int) and data2_len (size_t) to char*
-    char flag_buffer[FLAG_BUFFER_SIZE];
-    snprintf(flag_buffer, FLAG_BUFFER_SIZE, "%d", flag);
-
-    // Fill garbage of write before sending
-    for (int i=strlen(flag_buffer); i<FLAG_BUFFER_SIZE; i++) {
-        flag_buffer[i] = GARBAGE_FILL;
-    }
-
-    int n = write(socket, flag_buffer, FLAG_BUFFER_SIZE-1);           // todo =FLAG_BUFFER_SIZE-1  ?
-    if (n < 0) {
-        perror("write");
-        exit(EXIT_FAILURE);
-    }
-
-    return n;
-} 
-
-/* 
-  Shorthand function to read (char*) flags from a socket adress. Returns the 
-  flag as an int.
-*/
-int rpc_read_flag(int socket) {
-    // Initiate buffers to read in rpc_data fields
-    char flag_buffer[FLAG_BUFFER_SIZE];
-
-    // Read in flag
-    int n = read(socket, flag_buffer, FLAG_BUFFER_SIZE-1);
-	if (n < 0) {
-		// perror("read");       
-        return SERVER_FLAG_EMPTY;
-		// exit(EXIT_FAILURE);
-	}   
-    flag_buffer[n] = '\0';
-
-    // Convert and return flag
-    return atoi(flag_buffer);
-}
-
 rpc_handle *rpc_find(rpc_client *cl, char *name) {
     // Malloc space to return a handle
     rpc_handle *handle = malloc(sizeof(rpc_handle));
@@ -472,8 +441,11 @@ rpc_handle *rpc_find(rpc_client *cl, char *name) {
     // Fill temporary values for handle
     handle->handle_id = NO_HANDLE;
     handle->function = NULL;				// Client doesn't need access to server side function pointer
-    // handle->function_name = name;        // -- todo fix issue here
-
+    for (int i=0;i<MAX_NAME_LENGTH;i++) {
+        /* Fill name with GARBAGE VALUE as to not pass around unsigned data
+           Handle doesn't need function name to be called by client. */
+        handle->function_name[i] = GARBAGE_FILL;
+    }
 
     // Send flag to server to let it know rpc_find has been called
     rpc_send_flag(cl->sockfd, SERVER_FLAG_FIND);
@@ -512,13 +484,11 @@ cleanup:
     exit(EXIT_FAILURE);
 }
 
-
 rpc_data *rpc_call(rpc_client *cl, rpc_handle *h, rpc_data *payload) {
     // Make sure data and handle exist
     if (rpc_check_data(payload)<0) return NULL;
     if (h == NULL) return NULL;
     
-
     // Check if protocol can send data2
     if (payload->data2_len > PACKET_LIMIT) {
         perror("Overlength error");
@@ -549,6 +519,9 @@ rpc_data *rpc_call(rpc_client *cl, rpc_handle *h, rpc_data *payload) {
 void rpc_close_client(rpc_client *cl) {
     if (cl == NULL) return;
     else {
+        // Signal to linked server operation is complete
+        rpc_send_flag(cl->sockfd, SERVER_FLAG_EMPTY);
+
         // Close and free client
         close(cl->sockfd);
         free(cl);
@@ -556,16 +529,14 @@ void rpc_close_client(rpc_client *cl) {
     }
 }
 
+
+// ===== Shared functions =====
+
 void rpc_data_free(rpc_data *data) {
-    if (data == NULL) {
-        return;
-    }
-    if (data->data2 != NULL) {
-        free(data->data2);
-    }
+    if (data == NULL) return;
+    if (data->data2 != NULL) free(data->data2);
     free(data);
 }
-
 
 /*
   Writes data fields of rpc_data* `payload` to socket file descriptor `socket`,
@@ -602,8 +573,8 @@ int rpc_send_data(int socket, rpc_data *payload) {
     snprintf(int_buffer, MAX_INT_LENGTH, "%d", payload->data1);
     // Fill remaining buffer garbage with replacement garbage value
     /* Buffer has to be written as MAX_INT_LENGTH -1 instead of strlen(buffer)
-    as inorder to ensure that the max possible int is read on the read side
-    each time, MAX_INT_LENGTH-1 must be read.*/
+       as inorder to ensure that the max possible int is read on the read side
+       each time, MAX_INT_LENGTH-1 must be read.*/
     for (int i=strlen(int_buffer); i<MAX_INT_LENGTH; i++) {
         int_buffer[i] = GARBAGE_FILL;
     }
@@ -644,7 +615,6 @@ int rpc_send_data(int socket, rpc_data *payload) {
     // Packet successfully sent
     return 0;
 }
-
 
 /*
   Reads data fields of rpc_data* from a socket file descriptor `socket`,
@@ -720,15 +690,64 @@ cleanup:
     exit(EXIT_FAILURE);
 }
 
+/*
+  Takes an rpc_data pointer `data`, checking if it exists in a legal state. 
+  If data does not exist or has invalid fields it returns -1, otherwise 0.
+*/
 int rpc_check_data(rpc_data *data) {
     if (data == NULL) return -1;
     if (data->data2_len < 0) return -1;
     else if (data->data2_len == 0 && data->data2 != NULL) return -1;
     else if (data->data2_len != 0 && data->data2 == NULL) return -1;
-    // printf("..%ld %ld\n", data->data2_len, strlen(data->data2));     // not checkable right now...
     return 0;
 }
 
+/* 
+  Shorthand function to send (int) flags to a socket adress. Returns the number
+  of bytes sent (should be < FLAG_BUFFER_SIZE, > 0 in length). 
+*/
+int rpc_send_flag(int socket, int flag) {
+    // Convert data1 (int) and data2_len (size_t) to char*
+    char flag_buffer[FLAG_BUFFER_SIZE];
+    snprintf(flag_buffer, FLAG_BUFFER_SIZE, "%d", flag);
+
+    // Fill garbage of write before sending
+    for (int i=strlen(flag_buffer); i<FLAG_BUFFER_SIZE; i++) {
+        flag_buffer[i] = GARBAGE_FILL;
+    }
+
+    int n = write(socket, flag_buffer, FLAG_BUFFER_SIZE-1);
+    if (n < 0) {
+        perror("write");
+        exit(EXIT_FAILURE);
+    }
+
+    return n;
+} 
+
+/* 
+  Shorthand function to read (char*) flags from a socket adress. Returns the 
+  flag as an int.
+*/
+int rpc_read_flag(int socket) {
+    // Initiate buffers to read in rpc_data fields
+    char flag_buffer[FLAG_BUFFER_SIZE];
+
+    // Read in flag
+    int n = read(socket, flag_buffer, FLAG_BUFFER_SIZE-1);
+	if (n < 0) {
+		// perror("read");       
+        return SERVER_FLAG_EMPTY;
+		// exit(EXIT_FAILURE);
+	}   
+    flag_buffer[n] = '\0';
+
+    // Convert and return flag
+    return atoi(flag_buffer);
+}
+
+
+// ===== Printing functions (for debugging) =====
 
 void rpc_print_handle(rpc_handle *handle) {
     printf("handle_id: %d\n", handle->handle_id);
