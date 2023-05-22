@@ -8,28 +8,38 @@ Real world: Only a subset of users authenticated to be whitelisted or allowed
     connection. 
 
 2.
-Project: 
+Project: The functions that use the framework, to keep the RPC framework from
+    feature creep and becoming bloated.
 Real world: Provided via othermeans, as placing authentication inside the RPC 
     framework bloats it's purpose and decreases cohesion. Authentication should
     be tacked on top via whatever linking method between client and RPC server
     utilise.
 
 3.
+Project: TCP -> guaranteed transmission and back and forth pairing (connections)
+    between the client and server is ideal.
+Real world: TCP -> same reasons as Project motivation.
 
 4.
 Project: Sockets should be created in the server and client generation, and 
-    linked into full sockets upon registration.
-Real world: Client socket can still be issued on creation, however server socket
-    should only be created and linked at the registration stage, to allow 
-    multiple clients access to the same server.
+    linked into full sockets upon registration (when server is 'serving all').
+Real world: Client/server sockets can be created at any stage before first
+    communication, with a focus on allowing multiple clients access to the same 
+    server.
 
 5.
+Project: client and server are built from rpc.o. Dynamic allocation might be 
+    better for management of program communication and the growing and share 
+    information between them at runtime.
+Real world: Both should be dynamic, to err on the side of scalability that 
+    this dynamism allows.
 
 6.
 Project: if one host uses big-endian and another little-endian there will be a 
     mismatch in the data transferred (or rather, read) between the hosts. Both 
     hosts will work on their own but communication (and effectively all steps
-    that make these instances meaningful) will not be possible.
+    that make these instances meaningful) will not be possible. Endianness will
+    need to be managed in some form.
 Real world: Some buffer in between will most likely transform the data over the 
     network to the correct byte ordering. This issue should be managed fairly
     seemlessly. (e.g. Server may have some step that checks and converts all 
@@ -38,11 +48,40 @@ Real world: Some buffer in between will most likely transform the data over the
 
 
 ===== Protocol =====
+--- Design ---
+Protocol links between applications (client & server) w/ sockets
+Operation type is requested from server
+    If function search: Search is queried and function is returned as a callable
+      (via RPC connection) object if present.
+    If function action: Function call is sent to server. If present, data is 
+      converted from it's type to a string, written and read to server. Function
+      is performed. Data is written back and transformed back once again.
+Multiple clients can link to the server at a time via threads. Clients cannot 
+  specify a chain of requests, and must receive response back before continuing.
+
+--- Some justifications ---
+To manage system-dependent information and endianness of the data in packets, 
+data fields can be stored and shared between sockets in the form of strings
+(or char*s). Strings aren't susceptible to endianness (unlike other forms of
+bytestreams...) when written and read as such, with the 3rd field data2
+being converted from void* to a char* of length data2_len on transfer.
+Likewise, ints and size_t datafields are also converted to strings and written.
+
+To manage maximum packet size all data with a data2 field of data2_len greater
+than 65535 (the max packet size) are rejected and managed. In the real world, 
+packets could be broken up and ordered in some fixed manner, but this management
+technique wasn't employed here.
+
 Transport has to run on top of IPv6 so realistically only two options exist for 
 transport protocol - TCP, UDP. One of these two protocols is essentially 
 required as majority of firewalls nowadays block everything other than TCP and 
 UDP, and thus for any other protocol, a large number of users would not be able 
 to interact with the RPC system.
 
-??? TCP provides authentication and ....
-<benefits of TCP over UDP>
+TCP is better than default UDP for this project as it allows connections between 
+the server and client, actively sending information back and forth. Even more
+importantly, the transmission is guaranteed and secure, meaning that important 
+operations can be done by the RPC network without risk of losing information or
+being intercepted. Although UDP is faster and lighter, this loss of guarantee
+makes recalling sums and operations messy and these beneftis really don't 
+outweigh all the negatives.

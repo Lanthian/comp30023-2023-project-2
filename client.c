@@ -81,12 +81,12 @@ int main(int argc, char *argv[]) {
     // printf("3 (using handle_add2 = %p)\n", handle_add2);         // temprint
     // return -1;
 
-    for (int i = 0; i < 2; i++) {
+    for (int i = 0; i < 4; i++) {
         /* Prepare request */
         char left_operand = i;             // i
         char right_operand = 100;           // 100
         rpc_data request_data = {
-            .data1 = left_operand, .data2_len = 1, .data2 = &right_operand};
+            .data1 = left_operand, .data2_len = 1, .data2 = &right_operand};      // &right_operand
 
         /* Call and receive response */
         rpc_data *response_data = rpc_call(client, handle_add2, &request_data);

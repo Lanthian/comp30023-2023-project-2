@@ -60,27 +60,8 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Failed to register add2\n");
         exit(EXIT_FAILURE);
     }
-
-    // for (int i = 0; i < 1; i++) {
-    //     rpc_print_handle(get_server_handle(server));
-    // }        // temprint
-
-    // todo - check if rpc_register done properly
-
-    // temp - testing add2
-    char left_operand = 13;             // i
-    char right_operand = 101;           // 100
-    rpc_data request_data = {
-        .data1 = left_operand, .data2_len = 1, .data2 = &right_operand};
     
-    // rpc_print_data(&request_data);
-    // rpc_print_data(add2_i8(&request_data));
-    // test_func_handle(server, &request_data);
-
-
-    // printf("Serving all right now:\n");      // temprint
     rpc_serve_all(server);
-    // printf("Somehow done serving all...?\n");        // temprint
 
     return 0;
 }

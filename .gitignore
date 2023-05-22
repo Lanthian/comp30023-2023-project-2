@@ -5,3 +5,5 @@ client
 *.exe
 *.o
 *.BAK
+client-valgrind-out.txt
+server-valgrind-out.txt
